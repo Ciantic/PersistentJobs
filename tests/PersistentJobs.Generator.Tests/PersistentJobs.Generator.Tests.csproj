@@ -10,8 +10,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\PersistentJobs.Generator\PersistentJobs.Generator.csproj" />
-    <ProjectReference Include="..\PersistentJobs\PersistentJobs.csproj" />
+    <ProjectReference Include="..\..\src\PersistentJobs.Generator\PersistentJobs.Generator.csproj" />
+    <ProjectReference Include="..\..\src\PersistentJobs\PersistentJobs.csproj" />
   </ItemGroup>
 
   <ItemGroup>
