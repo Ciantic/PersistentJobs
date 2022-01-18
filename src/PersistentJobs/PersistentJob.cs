@@ -55,6 +55,10 @@ public class PersistentJob
 
         // Get input parameter
         var inputPar = parameters.First();
+        if (inputPar.Name != "input")
+        {
+            throw new Exception("First parameter is required to be `input`");
+        }
         var inputValue = JsonSerializer.Deserialize(InputJson, inputPar.ParameterType);
         var invokeParams = new List<object?>() { inputValue };
 
@@ -77,6 +81,9 @@ public class PersistentJob
     }
 }
 
+public class DeferredTask<Output> { }
+
+/*
 public interface IJobRunning<Output>
 {
     public Output? Completed();
@@ -87,6 +94,7 @@ public interface IJob<Input, Output>
 {
     public Task<IJobRunning<Output>> StartAsync(Input input);
 }
+*/
 
 public class JobService : IHostedService
 {
@@ -107,7 +115,8 @@ public class JobService : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _timer = new Timer(DoWork, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+        // Timer runs the callback `DoWork` in it's own thread
+        _timer = new Timer(RunAll, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
         return Task.CompletedTask;
     }
 
@@ -119,20 +128,17 @@ public class JobService : IHostedService
         await Queue.Process();
     }
 
-    private async void DoWork(object? state)
+    private async void RunAll(object? state)
     {
         using var scope = _services.CreateScope();
         using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
-        var unstarted = context.Set<PersistentJob>().Where(p => p.Started == null).First();
-    }
 
-    private static void Methods(Assembly assembly)
-    {
-        Dictionary<string, MethodInfo> methods = assembly
-            .GetTypes()
-            .SelectMany(x => x.GetMethods())
-            .Where(y => y.GetCustomAttributes().OfType<JobAttribute>().Any())
-            .ToDictionary(z => z.Name);
+        // Pick one unstarted job and start it
+        var unstarted = await context
+            .Set<PersistentJob>()
+            .Where(p => p.Started == null)
+            .FirstAsync();
+        unstarted?.Execute(context, _services);
     }
 }
 
@@ -145,4 +151,4 @@ public static class ModelBuilderExtension
 }
 
 [AttributeUsage(AttributeTargets.Method)]
-public class JobAttribute : Attribute { }
+public class CreateDeferredAttribute : Attribute { }

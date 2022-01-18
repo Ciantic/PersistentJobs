@@ -12,14 +12,6 @@ using Xunit.Sdk;
 
 namespace PersistentJobs.Tests;
 
-public class ExampleJob : IJob<int, bool>
-{
-    public Task<IJobRunning<bool>> StartAsync(int input)
-    {
-        throw new System.NotImplementedException();
-    }
-}
-
 public partial class Worker
 {
     public class Input
@@ -28,7 +20,7 @@ public partial class Worker
         public string Other { get; set; } = "";
     }
 
-    [Job]
+    [CreateDeferred]
     private static Task ExampleJobAsync(int input, DbContext dbContext)
     {
         return Task.CompletedTask;

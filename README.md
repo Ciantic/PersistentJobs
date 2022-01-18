@@ -4,13 +4,13 @@ Does not work yet, don't try.
 
 ##
 
-For given it a static method with returning Task, e.g.
+With a static method returning Task, e.g.
 
 ```C#
 public partial class Worker
 {
-    [Job]
-    private static Task _ExampleJob(int input, DbContext dbContext)
+    [CreateDeferred]
+    private static Task SendEmail(string input, IEmailSender sender)
     {
         // Your code...
         return Task.CompletedTask;
@@ -18,26 +18,31 @@ public partial class Worker
 }
 ```
 
-It generates corresponding public method for invoking persistent Job:
+It generates corresponding public method with `Deferred` suffix:
 
 ```c#
 public partial class Worker
 {
-    public static PersistentTask ExampleJob(int input)
+    public static DeferredTask SendEmailDeferred(string input, DbContext dbContext)
     {
-        // Returns persistent task that allows to query is it ready? What is the output value?
+        // Returns deferred task that allows to query is it ready? What is the output value? It does not allow to await for the task to finish.
     }
 }
 ```
 
+Generated method stores the call to the database, in effect deferring it's execution until the `JobService` executes it.
+
+It's notable that it omits the `IEmailSender`, because it replaces the function with a version which just stores the task in the database.
+
+<!--
 as well as an IJob:
 
 ```C#
-public class ExampleJob : IJob<int, bool>
+public class Example : IJob<int, bool>
 {
     public Task<IJobRunning<bool>> StartAsync(int input)
     {
         // Your code...
     }
 }
-```
+``` -->

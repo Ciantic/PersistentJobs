@@ -25,12 +25,12 @@ namespace PersistentJobs.Generator
             if (!(context.SyntaxContextReceiver is SyntaxReceiver receiver))
                 return;
 
-            if (receiver.MethodsWithJobAttribute.Count() == 0)
+            if (receiver.MethodsWithCreateDeferredAttribute.Count() == 0)
             {
                 return;
             }
 
-            var m = receiver.MethodsWithJobAttribute.FirstOrDefault();
+            var m = receiver.MethodsWithCreateDeferredAttribute.FirstOrDefault();
             var namespaceName = m.ContainingNamespace.ToDisplayString();
             var className = m.ContainingType.Name;
             var methodName = m.Name;
@@ -56,15 +56,8 @@ namespace PersistentJobs.Generator
                 {{ 
                     public partial class {className}
                     {{
-                        public static string {methodName}() {{
+                        public static string {methodName}Deferred() {{
                             return ""Hello World"";
-                        }}
-
-                        public static string Goo() {{
-                            return ""Foooo"";
-                        }}
-                        public static string Zoo_{methodName}() {{
-                            return ""Foooo"";
                         }}
                     }}
                 }}
@@ -77,7 +70,8 @@ namespace PersistentJobs.Generator
 
     class SyntaxReceiver : ISyntaxContextReceiver
     {
-        public List<IMethodSymbol> MethodsWithJobAttribute { get; } = new List<IMethodSymbol>();
+        public List<IMethodSymbol> MethodsWithCreateDeferredAttribute { get; } =
+            new List<IMethodSymbol>();
 
         public void OnVisitSyntaxNode(GeneratorSyntaxContext context)
         {
@@ -96,7 +90,7 @@ namespace PersistentJobs.Generator
                         )
                 )
                 {
-                    MethodsWithJobAttribute.Add(methodSymbol);
+                    MethodsWithCreateDeferredAttribute.Add(methodSymbol);
                 }
             }
         }

@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
 using Xunit;
+
 /**
  * https://github.com/dotnet/roslyn/blob/main/docs/features/source-generators.cookbook.md#unit-testing-of-generators
  **/
@@ -29,7 +30,7 @@ public class GeneratorTests
                         public string Something { get; set; }
                     }
 
-                    [Job]
+                    [CreateDeferred]
                     private static Task DoSomething(Input input, AppDbContext dbContext) {
                         return Task.CompletedTask;
                     }
@@ -52,7 +53,7 @@ public class GeneratorTests
             namespace PersistentJobs
             {
                 [AttributeUsage(AttributeTargets.Method)]
-                sealed class JobAttribute : Attribute
+                sealed class CreateDeferredAttribute : Attribute
                 {
                 }
 
@@ -82,7 +83,7 @@ public class GeneratorTests
         var text = runResult.GeneratedTrees.First().GetText();
 
         var attributeSymbol = outputCompilation.GetTypeByMetadataName(
-            "PersistentJobs.JobAttribute"
+            "PersistentJobs.CreateDeferredAttribute"
         );
 
         Assert.Equal(3, outputCompilation.SyntaxTrees.Count());
