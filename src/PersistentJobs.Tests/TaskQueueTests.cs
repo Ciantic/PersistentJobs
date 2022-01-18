@@ -13,9 +13,9 @@ using PersistentJobs;
 using Xunit;
 using Xunit.Sdk;
 
-public class Tests
+public class TaskQueueTests
 {
-    [Fact]
+    [Fact] 
     public async Task TestCancellation()
     {
         var n = 0;

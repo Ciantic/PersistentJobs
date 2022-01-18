@@ -23,13 +23,19 @@ public class GeneratorTests
 
             namespace MyCode
             {
-                public class Program
+                public partial class Program
                 {
                     public class Input {
                         public string Something { get; set; }
                     }
+
                     [Job]
-                    public static Task DoSomething(Input input, AppDbContext dbContext) {
+                    private static Task DoSomething(Input input, AppDbContext dbContext) {
+                        return Task.CompletedTask;
+                    }
+
+                    [Foo]
+                    private static Task NotThis() {
                         return Task.CompletedTask;
                     }
 
@@ -47,6 +53,11 @@ public class GeneratorTests
             {
                 [AttributeUsage(AttributeTargets.Method)]
                 sealed class JobAttribute : Attribute
+                {
+                }
+
+                [AttributeUsage(AttributeTargets.Method)]
+                sealed class FooAtribute : Attribute
                 {
                 }
             }
@@ -74,14 +85,14 @@ public class GeneratorTests
             "PersistentJobs.JobAttribute"
         );
 
-        Assert.Equal(2, outputCompilation.SyntaxTrees.Count());
+        Assert.Equal(3, outputCompilation.SyntaxTrees.Count());
         Assert.True(diagnostics.IsEmpty);
         // GeneratorDriverRunResult runResult = driver.GetRunResult();
-        // GeneratorRunResult generatorResult = runResult.Results[0];
-        // Assert.True(generatorResult.Generator == generator);
-        // Assert.True(generatorResult.Diagnostics.IsEmpty);
-        // Assert.True(generatorResult.GeneratedSources.Length == 1);
-        // Assert.True(generatorResult.Exception is null);
+        GeneratorRunResult generatorResult = runResult.Results[0];
+        Assert.True(generatorResult.Generator == generator);
+        Assert.True(generatorResult.Diagnostics.IsEmpty);
+        Assert.True(generatorResult.GeneratedSources.Length == 1);
+        Assert.True(generatorResult.Exception is null);
     }
 
     private static Compilation CreateCompilation(string source, string source2) =>

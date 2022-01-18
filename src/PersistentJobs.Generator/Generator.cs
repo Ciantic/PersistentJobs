@@ -24,13 +24,16 @@ namespace PersistentJobs.Generator
         {
             if (!(context.SyntaxContextReceiver is SyntaxReceiver receiver))
                 return;
+
             if (receiver.MethodsWithJobAttribute.Count() == 0)
             {
                 return;
             }
 
             var m = receiver.MethodsWithJobAttribute.FirstOrDefault();
-            var ns = m.ContainingNamespace.Name.ToString();
+            var namespaceName = m.ContainingNamespace.ToDisplayString();
+            var className = m.ContainingType.Name;
+            var methodName = m.Name;
 
             // var compilation = context.Compilation;
             // var attributeSymbol = compilation.GetTypeByMetadataName("PersistentJobs.JobAttribute");
@@ -46,22 +49,29 @@ namespace PersistentJobs.Generator
             //     .Where(d => d.Name.ToString() == "Job");
 
             var source = FormattableString.Invariant(
-                $@"namespace {ns}
+                $@"
+                using PersistentJobs;
+
+                namespace {namespaceName}
                 {{ 
-                    public class MyGeneratedClass
+                    public partial class {className}
                     {{
-                        public string HelloWorld() {{
+                        public static string {methodName}() {{
                             return ""Hello World"";
                         }}
 
-                        public string Goo() {{
+                        public static string Goo() {{
+                            return ""Foooo"";
+                        }}
+                        public static string Zoo_{methodName}() {{
                             return ""Foooo"";
                         }}
                     }}
-                }}"
+                }}
+                "
             );
             SourceText sourceText = SourceText.From(source, Encoding.UTF8);
-            context.AddSource("HelloWorld.cs", sourceText);
+            context.AddSource("Foo.g.cs", sourceText);
         }
     }
 
@@ -76,11 +86,7 @@ namespace PersistentJobs.Generator
                 && methodDeclarationSyntax.AttributeLists.Count > 0
             )
             {
-                var methodSymbol =
-                    ModelExtensions.GetDeclaredSymbol(
-                        context.SemanticModel,
-                        methodDeclarationSyntax
-                    ) as IMethodSymbol;
+                var methodSymbol = context.SemanticModel.GetDeclaredSymbol(methodDeclarationSyntax);
 
                 if (
                     methodSymbol

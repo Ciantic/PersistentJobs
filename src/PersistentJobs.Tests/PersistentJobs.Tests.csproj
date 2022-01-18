@@ -10,6 +10,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PersistentJobs.Generator\PersistentJobs.Generator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+
     <ProjectReference Include="..\PersistentJobs\PersistentJobs.csproj" />
   </ItemGroup>
 
