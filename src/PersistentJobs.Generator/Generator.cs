@@ -31,6 +31,7 @@ namespace PersistentJobs.Generator
             }
 
             var m = receiver.MethodsWithCreateDeferredAttribute.FirstOrDefault();
+            var inputTypeName = m.Parameters[0].Type.ToDisplayString();
             var namespaceName = m.ContainingNamespace.ToDisplayString();
             var className = m.ContainingType.Name;
             var methodName = m.Name;
@@ -48,21 +49,28 @@ namespace PersistentJobs.Generator
             //     .OfType<AttributeSyntax>()
             //     .Where(d => d.Name.ToString() == "Job");
 
-            var source = FormattableString.Invariant(
-                $@"
-                using PersistentJobs;
+            var source = FormattableString
+                .Invariant(
+                    $@"
+                    using PersistentJobs;
 
-                namespace {namespaceName}
-                {{ 
-                    public partial class {className}
-                    {{
-                        public static string {methodName}Deferred() {{
-                            return ""Hello World"";
+                    namespace {namespaceName}
+                    {{ 
+                        public partial class {className}
+                        {{
+                            public static string {methodName}Deferred(
+                                {inputTypeName} input, 
+                                Microsoft.EntityFrameworkCore.DbContext context
+                            ) 
+                            {{
+                                return ""Hello World"";
+                            }}
                         }}
                     }}
-                }}
-                "
-            );
+                    "
+                )
+                .Replace("                    ", "");
+            ;
             SourceText sourceText = SourceText.From(source, Encoding.UTF8);
             context.AddSource("Foo.g.cs", sourceText);
         }
@@ -86,7 +94,9 @@ namespace PersistentJobs.Generator
                     methodSymbol
                         .GetAttributes()
                         .Any(
-                            x => x.AttributeClass.ToDisplayString() == "PersistentJobs.JobAttribute"
+                            x =>
+                                x.AttributeClass.ToDisplayString()
+                                == "PersistentJobs.CreateDeferredAttribute"
                         )
                 )
                 {

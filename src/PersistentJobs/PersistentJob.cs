@@ -5,7 +5,6 @@ using System.Security.AccessControl;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace PersistentJobs;
 
@@ -37,7 +36,7 @@ public class PersistentJob
         return method;
     }
 
-    async public void Execute(DbContext context, IServiceProvider? serviceProvider = null)
+    async public Task<object?> Execute(DbContext context, IServiceProvider? serviceProvider = null)
     {
         Started = DateTime.UtcNow;
         try
@@ -46,7 +45,7 @@ public class PersistentJob
         }
         catch (DBConcurrencyException)
         {
-            return;
+            return null;
             // pass
         }
 
@@ -77,78 +76,6 @@ public class PersistentJob
         OutputJson = JsonSerializer.Serialize(outputValue);
         await context.SaveChangesAsync();
 
-        Console.WriteLine("Output {0}", outputValue);
+        return outputValue;
     }
 }
-
-public class DeferredTask<Output> { }
-
-/*
-public interface IJobRunning<Output>
-{
-    public Output? Completed();
-    public Task CancelAsync();
-}
-
-public interface IJob<Input, Output>
-{
-    public Task<IJobRunning<Output>> StartAsync(Input input);
-}
-*/
-
-public class JobService : IHostedService
-{
-    private readonly TaskQueue Queue = new();
-    private Timer _timer = null!;
-
-    private readonly IServiceProvider _services;
-
-    // public void Dispose()
-    // {
-    //     throw new NotImplementedException();
-    // }
-
-    public JobService(IServiceProvider services)
-    {
-        _services = services;
-    }
-
-    public Task StartAsync(CancellationToken cancellationToken)
-    {
-        // Timer runs the callback `DoWork` in it's own thread
-        _timer = new Timer(RunAll, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
-        return Task.CompletedTask;
-    }
-
-    public async Task StopAsync(CancellationToken cancellationToken)
-    {
-        // TODO: For this to work right, one should not add anything to queue
-        // after this
-        Queue.Cancel();
-        await Queue.Process();
-    }
-
-    private async void RunAll(object? state)
-    {
-        using var scope = _services.CreateScope();
-        using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
-
-        // Pick one unstarted job and start it
-        var unstarted = await context
-            .Set<PersistentJob>()
-            .Where(p => p.Started == null)
-            .FirstAsync();
-        unstarted?.Execute(context, _services);
-    }
-}
-
-public static class ModelBuilderExtension
-{
-    public static void AddPersistentJobs(this ModelBuilder modelBuilder)
-    {
-        modelBuilder.Entity<PersistentJob>().Property(p => p.IdempotencyKey).IsConcurrencyToken();
-    }
-}
-
-[AttributeUsage(AttributeTargets.Method)]
-public class CreateDeferredAttribute : Attribute { }

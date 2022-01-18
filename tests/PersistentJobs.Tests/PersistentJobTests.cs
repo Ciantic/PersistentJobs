@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using System.Linq;
 using System.Net.Security;
@@ -14,25 +15,23 @@ namespace PersistentJobs.Tests;
 
 public partial class Worker
 {
-    public class Input
+    public record Input
     {
-        public string Test { get; set; } = "";
-        public string Other { get; set; } = "";
+        public string First { get; set; } = "";
+        public string Second { get; set; } = "";
     }
 
     [CreateDeferred]
-    private static Task ExampleJobAsync(int input, DbContext dbContext)
+    private static Task<int> ExampleJob(int input)
     {
-        return Task.CompletedTask;
+        return Task.FromResult(input + 5);
     }
 
-    public static int Foo(Input input, DbContext dbContext)
+    public static string UnmarkedMethod(Input input, DbContext dbContext)
     {
-        var jobs = dbContext.Set<PersistentJob>().ToArray();
-        // var a = Worker.HelloWorld();
-        // var foo = HelloWorld();
-        // var zoo = Zoo_ExampleJobAsync();
-        return jobs.Length;
+        // var jobs = dbContext.Set<PersistentJob>().ToArray();
+        // return jobs.Length;
+        return input.First + " " + input.Second;
     }
 }
 
@@ -50,7 +49,7 @@ public class TestDbContext : DbContext
 
 public class PersistentJobTests
 {
-    public DbContext Create()
+    static public DbContext Create()
     {
         var options =
             new DbContextOptionsBuilder<TestDbContext>().UseSqlite(
@@ -65,7 +64,7 @@ public class PersistentJobTests
     }
 
     [Fact]
-    public void TestExecute()
+    async public void TestExecution()
     {
         var c = Create();
 
@@ -73,15 +72,16 @@ public class PersistentJobTests
         {
             AssemblyName = "PersistentJobs.Tests",
             ClassName = "PersistentJobs.Tests.Worker",
-            MethodName = "Foo",
-            InputJson = "{ \"Test\" : \"Foo\", \"Other\" : \"Great\" }"
+            MethodName = "UnmarkedMethod",
+            InputJson = "{ \"First\" : \"Foo\", \"Second\" : \"Bar\" }"
         };
 
         var services = new ServiceCollection();
         services.AddSingleton(c);
         var provider = services.BuildServiceProvider();
 
-        p.Execute(c, provider);
+        object? output = await p.Execute(c, provider);
+        Assert.Equal("Foo Bar", output);
     }
 
     [Fact]
@@ -89,12 +89,14 @@ public class PersistentJobTests
     {
         var context = Create();
 
-        context.Add(new PersistentJob() { InputJson = "5" });
-        context.SaveChanges();
+        Worker.ExampleJobDeferred(42, context);
 
-        Assert.Equal(
-            "5",
-            context.Set<PersistentJob>().Where(p => p.InputJson == "5").First().InputJson
-        );
+        // context.Add(new PersistentJob() { InputJson = "5" });
+        // context.SaveChanges();
+
+        // Assert.Equal(
+        //     "5",
+        //     context.Set<PersistentJob>().Where(p => p.InputJson == "5").First().InputJson
+        // );
     }
 }
