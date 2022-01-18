@@ -7,11 +7,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{89B86C8F-C75
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PersistentJobs", "src\PersistentJobs\PersistentJobs.csproj", "{A699492B-8021-4612-B2AD-F4D28F9BE384}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PersistentJobs.Tests", "src\PersistentJobs.Tests\PersistentJobs.Tests.csproj", "{B5730A5D-2646-48A7-9C27-05595CFC61DF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PersistentJobs.Tests", "tests\PersistentJobs.Tests\PersistentJobs.Tests.csproj", "{B5730A5D-2646-48A7-9C27-05595CFC61DF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PersistentJobs.Generator", "src\PersistentJobs.Generator\PersistentJobs.Generator.csproj", "{79620F47-4DFF-4B19-BA22-035853F4E596}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PersistentJobs.Generator.Tests", "src\PersistentJobs.Generator.Tests\PersistentJobs.Generator.Tests.csproj", "{3944F92C-8A31-49F2-AB69-F39CAC3D8A90}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PersistentJobs.Generator.Tests", "tests\PersistentJobs.Generator.Tests\PersistentJobs.Generator.Tests.csproj", "{3944F92C-8A31-49F2-AB69-F39CAC3D8A90}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
