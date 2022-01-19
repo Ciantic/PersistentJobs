@@ -65,7 +65,7 @@ public class GeneratorTests
             "
         );
 
-        var generator = new MySourceGenerator();
+        var generator = new DeferredGenerator();
 
         GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
         driver = driver.RunGeneratorsAndUpdateCompilation(
