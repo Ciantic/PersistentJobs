@@ -28,6 +28,7 @@ namespace PersistentJobs.Generator
             }
 
             var m = receiver.MethodsWithCreateDeferredAttribute.FirstOrDefault();
+            var assemblyName = m.ContainingAssembly.ToDisplayString();
             var inputTypeName = m.Parameters[0].Type.ToDisplayString();
             var namespaceName = m.ContainingNamespace.ToDisplayString();
             var className = m.ContainingType.Name;
@@ -50,17 +51,24 @@ namespace PersistentJobs.Generator
                 .Invariant(
                     $@"
                     using PersistentJobs;
+                    using System.Threading.Tasks;
 
                     namespace {namespaceName}
                     {{ 
                         public partial class {className}
                         {{
-                            public static string {methodName}Deferred(
+                            async public static Task {methodName}Deferred(
                                 {inputTypeName} input, 
                                 Microsoft.EntityFrameworkCore.DbContext context
                             ) 
                             {{
-                                return ""Hello World"";
+                                await PersistentJob.InsertJob(
+                                    context, 
+                                    ""{assemblyName}"",
+                                    ""{className}"",
+                                    ""{methodName}"",
+                                    input
+                                );
                             }}
                         }}
                     }}

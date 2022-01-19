@@ -4,14 +4,14 @@ using System.Reflection.Metadata.Ecma335;
 using System.Security.AccessControl;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace PersistentJobs;
 
 public class PersistentJob
 {
-    public Guid Id { get; set; }
-
+    public Guid Id { get; set; } = Guid.NewGuid();
     public string AssemblyName { get; set; } = "";
     public string ClassName { get; set; } = "";
     public string MethodName { get; set; } = "";
@@ -78,4 +78,32 @@ public class PersistentJob
 
         return outputValue;
     }
+
+    async static public Task<PersistentJob> InsertJob(
+        DbContext dbContext,
+        string assemblyName,
+        string className,
+        string methodName,
+        object inputValue
+    )
+    {
+        throw new NotImplementedException();
+    }
+
+    async static public Task<PersistentJob> InsertJob2(
+        DbContext dbContext,
+        // Func<int, Task<int>> a,
+        Delegate a,
+        object inputValue
+    )
+    {
+        var del = a.GetMethodInfo();
+        if (del != null)
+        {
+            var aa = del.DeclaringType.Assembly.Location;
+        }
+        throw new NotImplementedException();
+    }
+
+
 }

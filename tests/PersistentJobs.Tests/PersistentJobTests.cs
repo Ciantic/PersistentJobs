@@ -22,7 +22,7 @@ public partial class Worker
     }
 
     [CreateDeferred]
-    private static Task<int> ExampleJob(int input)
+    public static Task<int> ExampleJob(int input, DbContext dbContext)
     {
         return Task.FromResult(input + 5);
     }
@@ -85,11 +85,13 @@ public class PersistentJobTests
     }
 
     [Fact]
-    public void Test1()
+    async public void Test1()
     {
         var context = Create();
 
         Worker.ExampleJobDeferred(42, context);
+        await PersistentJob.InsertJob2(context, Worker.ExampleJob, 5);
+        // PersistentJob.InsertJob(context, )
 
         // context.Add(new PersistentJob() { InputJson = "5" });
         // context.SaveChanges();
