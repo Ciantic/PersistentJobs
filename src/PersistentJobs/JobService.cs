@@ -36,7 +36,8 @@ public class JobService : IHostedService
             .ToArray();
         foreach (var method in methods)
         {
-            if (_methods.ContainsKey(method.Name))
+            var key = method.Name.Replace("Deferred", "");
+            if (_methods.ContainsKey(key))
             {
                 throw new Exception("Only one with same name");
             }
@@ -46,7 +47,7 @@ public class JobService : IHostedService
             };
             var dell = Delegate.CreateDelegate(Expression.GetFuncType(types.ToArray()), method);
             // var dell = Delegate.CreateDelegate(Expression.GetDelegateType(types.ToArray()), method);
-            _methods[method.Name.Replace("Deferred", "")] = dell;
+            _methods[key] = dell;
         }
         _services = services;
     }
