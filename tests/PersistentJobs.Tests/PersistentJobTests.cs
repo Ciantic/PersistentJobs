@@ -3,7 +3,9 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using System.Linq;
 using System.Net.Security;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -64,41 +66,17 @@ public class PersistentJobTests
     }
 
     [Fact]
-    async public void TestExecution()
-    {
-        var c = Create();
-
-        var p = new PersistentJob()
-        {
-            AssemblyName = "PersistentJobs.Tests",
-            ClassName = "PersistentJobs.Tests.Worker",
-            MethodName = "UnmarkedMethod",
-            InputJson = "{ \"First\" : \"Foo\", \"Second\" : \"Bar\" }"
-        };
-
-        var services = new ServiceCollection();
-        services.AddSingleton(c);
-        var provider = services.BuildServiceProvider();
-
-        object? output = await p.Execute(c, provider);
-        Assert.Equal("Foo Bar", output);
-    }
-
-    [Fact]
-    async public void Test1()
+    async public void TestService()
     {
         var context = Create();
-
-        Worker.ExampleJobDeferred(42, context);
-        await PersistentJob.InsertJob2(context, Worker.ExampleJob, 5);
-        // PersistentJob.InsertJob(context, )
-
-        // context.Add(new PersistentJob() { InputJson = "5" });
-        // context.SaveChanges();
-
-        // Assert.Equal(
-        //     "5",
-        //     context.Set<PersistentJob>().Where(p => p.InputJson == "5").First().InputJson
-        // );
+        var services = new ServiceCollection();
+        services.AddSingleton(context);
+        var provider = services.BuildServiceProvider();
+        var service = new JobService(provider);
+        var deferred = await Worker.ExampleJobDeferred(42, context);
+        await service.RunAsync();
+        await PersistentJob.GotIt(context, deferred.Id);
     }
+
+
 }

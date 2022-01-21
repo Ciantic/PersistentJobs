@@ -1,42 +1,51 @@
-﻿using System.Data;
+﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.Data;
+using System.Diagnostics.Metrics;
 using System.Reflection;
 using System.Reflection.Metadata.Ecma335;
 using System.Security.AccessControl;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace PersistentJobs;
 
 public class PersistentJob
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
-    public string AssemblyName { get; set; } = "";
-    public string ClassName { get; set; } = "";
-    public string MethodName { get; set; } = "";
-    public string InputJson { get; set; } = "";
-    public string? OutputJson { get; set; } = null;
-    public DateTime Created { get; set; } = DateTime.UtcNow;
-    public DateTime? Started { get; set; } = null;
-    public DateTime? Ended { get; set; } = null;
-    public TimeSpan TimeLimit { get; set; } = TimeSpan.FromMinutes(30);
-    public Guid IdempotencyKey { get; set; } = Guid.NewGuid();
+    internal Guid Id { get; set; } = Guid.NewGuid();
 
-    private MethodInfo GetMethodInfo()
-    {
-        var method = Assembly.Load(AssemblyName).GetType(ClassName)?.GetMethod(MethodName);
+    // internal string AssemblyName { get; set; } = "";
+    // internal string ClassName { get; set; } = "";
+    internal string MethodName { get; set; } = "";
+    internal string InputJson { get; set; } = "";
+    internal string? OutputJson { get; set; } = null;
+    internal DateTime Created { get; set; } = DateTime.UtcNow;
+    internal DateTime? Started { get; set; } = null;
+    internal DateTime? Ended { get; set; } = null;
+    internal TimeSpan TimeLimit { get; set; } = TimeSpan.FromMinutes(30);
+    internal Guid IdempotencyKey { get; set; } = Guid.NewGuid();
 
-        if (method == null)
-        {
-            // TODO: This failure is pretty bad, do something to log it
-            throw new Exception("Method not found");
-        }
+    // private MethodInfo GetMethodInfo()
+    // {
+    //     var method = Assembly.Load(AssemblyName).GetType(ClassName)?.GetMethod(MethodName);
 
-        return method;
-    }
+    //     if (method == null)
+    //     {
+    //         // TODO: This failure is pretty bad, do something to log it
+    //         throw new Exception("Method not found");
+    //     }
 
-    async public Task<object?> Execute(DbContext context, IServiceProvider? serviceProvider = null)
+    //     return method;
+    // }
+
+    async internal Task<object?> Execute(
+        DbContext context,
+        MethodInfo method,
+        IServiceProvider? serviceProvider = null
+    )
     {
         Started = DateTime.UtcNow;
         try
@@ -49,7 +58,9 @@ public class PersistentJob
             // pass
         }
 
-        var method = GetMethodInfo();
+        // var method = jobService.GetMethod(MethodName);
+
+        // TODO: input and services should be cached on the JobService:
         var parameters = method.GetParameters();
 
         // Get input parameter
@@ -79,6 +90,51 @@ public class PersistentJob
         return outputValue;
     }
 
+    static private PersistentJob CreateFromMethod(Delegate d, object input)
+    {
+        var method = d.GetMethodInfo();
+        var assemblyName = method.DeclaringType?.Assembly.GetName().Name;
+        var className = method.DeclaringType?.FullName;
+        var methodName = method.Name;
+        if (assemblyName == null)
+        {
+            throw new ArgumentException("Assembly not determined");
+        }
+        if (className == null)
+        {
+            throw new ArgumentException("Class not determined");
+        }
+        return new PersistentJob()
+        {
+            // AssemblyName = assemblyName,
+            // ClassName = className,
+            MethodName = methodName,
+            InputJson = JsonSerializer.Serialize(input)
+        };
+    }
+
+    public async static Task<DeferredTask<O>> Insert<O>(DbContext context, Delegate d, object input)
+    {
+        var job = CreateFromMethod(d, input);
+        await context.Set<PersistentJob>().AddAsync(job);
+        await context.SaveChangesAsync();
+        return new DeferredTask<O>(job.Id);
+    }
+
+    public async static Task<bool> GotIt(DbContext context, Guid id)
+    {
+        await context.Set<PersistentJob>().Where(p => p.Id == id).FirstAsync();
+        return true;
+    }
+
+    // public delegate object Dell(params object[] a);
+
+    // static public PersistentJob CreateFromMethod2(Dell fun, object input)
+    // {
+    //     throw new NotImplementedException();
+    // }
+
+    /*
     async static public Task<PersistentJob> InsertJob(
         DbContext dbContext,
         string assemblyName,
@@ -104,6 +160,7 @@ public class PersistentJob
         }
         throw new NotImplementedException();
     }
+    */
 
 
 }

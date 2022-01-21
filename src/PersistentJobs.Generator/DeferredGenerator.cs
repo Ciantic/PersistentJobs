@@ -33,6 +33,7 @@ namespace PersistentJobs.Generator
             var namespaceName = m.ContainingNamespace.ToDisplayString();
             var className = m.ContainingType.Name;
             var methodName = m.Name;
+            var outputTypeName = m.ReturnType.Name;
 
             // var compilation = context.Compilation;
             // var attributeSymbol = compilation.GetTypeByMetadataName("PersistentJobs.JobAttribute");
@@ -57,11 +58,15 @@ namespace PersistentJobs.Generator
                     {{ 
                         public partial class {className}
                         {{
-                            async public static Task {methodName}Deferred(
+                            
+                            [IsDeferred]
+                            async public static Task<DeferredTask<{outputTypeName}>> {methodName}Deferred(
                                 {inputTypeName} input, 
                                 Microsoft.EntityFrameworkCore.DbContext context
                             ) 
                             {{
+                                return await PersistentJob.Insert<{outputTypeName}>(context, {methodName}, input);
+                                /*
                                 await PersistentJob.InsertJob(
                                     context, 
                                     ""{assemblyName}"",
@@ -69,6 +74,7 @@ namespace PersistentJobs.Generator
                                     ""{methodName}"",
                                     input
                                 );
+                                */
                             }}
                         }}
                     }}
