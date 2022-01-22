@@ -28,18 +28,15 @@ public class PersistentJob
     internal TimeSpan TimeLimit { get; set; } = TimeSpan.FromMinutes(30);
     internal Guid IdempotencyKey { get; set; } = Guid.NewGuid();
 
-    // private MethodInfo GetMethodInfo()
-    // {
-    //     var method = Assembly.Load(AssemblyName).GetType(ClassName)?.GetMethod(MethodName);
-
-    //     if (method == null)
-    //     {
-    //         // TODO: This failure is pretty bad, do something to log it
-    //         throw new Exception("Method not found");
-    //     }
-
-    //     return method;
-    // }
+    async internal Task Start(DbContext context)
+    {
+        Started = DateTime.UtcNow;
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DBConcurrencyException) { }
+    }
 
     async internal Task<object?> Execute(
         DbContext context,
@@ -47,17 +44,6 @@ public class PersistentJob
         IServiceProvider? serviceProvider = null
     )
     {
-        Started = DateTime.UtcNow;
-        try
-        {
-            await context.SaveChangesAsync();
-        }
-        catch (DBConcurrencyException)
-        {
-            return null;
-            // pass
-        }
-
         // var method = jobService.GetMethod(MethodName);
 
         // TODO: input and services should be cached on the JobService:
@@ -82,11 +68,15 @@ public class PersistentJob
             invokeParams.AddRange(services);
         }
 
-        // Execute and store to OutputJson
-        var outputValue = method.Invoke(null, invokeParams.ToArray());
-        OutputJson = JsonSerializer.Serialize(outputValue);
-        await context.SaveChangesAsync();
+        // Execute and store to OutputJson, some reason Task<_> is not castable to Task<object>
+        Task outputTask = (Task)method.Invoke(null, invokeParams.ToArray())!;
+        await outputTask.ConfigureAwait(false);
 
+        // TODO: Maybe the calling function could provide accurate type here?
+        var outputValue = ((dynamic)outputTask).Result;
+
+        OutputJson = JsonSerializer.Serialize(outputValue);
+        var changed = await context.SaveChangesAsync();
         return outputValue;
     }
 
@@ -113,54 +103,24 @@ public class PersistentJob
         };
     }
 
-    public async static Task<DeferredTask<O>> Insert<O>(DbContext context, Delegate d, object input)
+    /// <summary>
+    /// Insert the job to context (does not save it)
+    /// 
+    /// This behavior allows to add tasks transactionally.
+    /// </summary>
+    /// <param name="context"></param>
+    /// <param name="method"></param>
+    /// <param name="input"></param>
+    /// <typeparam name="O"></typeparam>
+    /// <returns></returns>
+    public async static Task<DeferredTask<O>> Insert<O>(
+        DbContext context,
+        Delegate method,
+        object input
+    )
     {
-        var job = CreateFromMethod(d, input);
+        var job = CreateFromMethod(method, input);
         await context.Set<PersistentJob>().AddAsync(job);
-        await context.SaveChangesAsync();
         return new DeferredTask<O>(job.Id);
     }
-
-    public async static Task<bool> GotIt(DbContext context, Guid id)
-    {
-        await context.Set<PersistentJob>().Where(p => p.Id == id).FirstAsync();
-        return true;
-    }
-
-    // public delegate object Dell(params object[] a);
-
-    // static public PersistentJob CreateFromMethod2(Dell fun, object input)
-    // {
-    //     throw new NotImplementedException();
-    // }
-
-    /*
-    async static public Task<PersistentJob> InsertJob(
-        DbContext dbContext,
-        string assemblyName,
-        string className,
-        string methodName,
-        object inputValue
-    )
-    {
-        throw new NotImplementedException();
-    }
-
-    async static public Task<PersistentJob> InsertJob2(
-        DbContext dbContext,
-        // Func<int, Task<int>> a,
-        Delegate a,
-        object inputValue
-    )
-    {
-        var del = a.GetMethodInfo();
-        if (del != null)
-        {
-            var aa = del.DeclaringType.Assembly.Location;
-        }
-        throw new NotImplementedException();
-    }
-    */
-
-
 }

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
@@ -33,20 +34,30 @@ namespace PersistentJobs.Generator
             var namespaceName = m.ContainingNamespace.ToDisplayString();
             var className = m.ContainingType.Name;
             var methodName = m.Name;
-            var outputTypeName = m.ReturnType.Name;
+            var retType = m.ReturnType;
+            var outputTypeName = "";
+            if (retType is INamedTypeSymbol)
+            {
+                var taskType = retType as INamedTypeSymbol;
+                if (taskType.Name != "Task")
+                {
+                    throw new Exception("Only tasks!");
+                }
 
-            // var compilation = context.Compilation;
-            // var attributeSymbol = compilation.GetTypeByMetadataName("PersistentJobs.JobAttribute");
+                if (!taskType.IsGenericType)
+                {
+                    throw new Exception("Only generic tasks");
+                }
 
-            // var allNodes = compilation.SyntaxTrees.SelectMany(s => s.GetRoot().DescendantNodes());
-            // var allClasses = allNodes
-            //     .Where(d => d.IsKind(SyntaxKind.ClassDeclaration))
-            //     .OfType<ClassDeclarationSyntax>();
+                var taskRetType = taskType.TypeArguments.First();
 
-            // var attributes = allNodes
-            //     .Where(d => d.IsKind(SyntaxKind.Attribute))
-            //     .OfType<AttributeSyntax>()
-            //     .Where(d => d.Name.ToString() == "Job");
+                // Get fully qualified outputname
+                outputTypeName = taskRetType.ToDisplayString(
+                    new SymbolDisplayFormat(
+                        typeQualificationStyle: SymbolDisplayTypeQualificationStyle.NameAndContainingTypesAndNamespaces
+                    )
+                );
+            }
 
             var source = FormattableString
                 .Invariant(
@@ -59,22 +70,12 @@ namespace PersistentJobs.Generator
                         public partial class {className}
                         {{
                             
-                            [IsDeferred]
                             async public static Task<DeferredTask<{outputTypeName}>> {methodName}Deferred(
                                 {inputTypeName} input, 
                                 Microsoft.EntityFrameworkCore.DbContext context
                             ) 
                             {{
                                 return await PersistentJob.Insert<{outputTypeName}>(context, {methodName}, input);
-                                /*
-                                await PersistentJob.InsertJob(
-                                    context, 
-                                    ""{assemblyName}"",
-                                    ""{className}"",
-                                    ""{methodName}"",
-                                    input
-                                );
-                                */
                             }}
                         }}
                     }}

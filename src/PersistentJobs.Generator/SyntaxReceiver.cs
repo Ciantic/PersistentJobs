@@ -21,6 +21,8 @@ namespace PersistentJobs.Generator
             {
                 var methodSymbol = context.SemanticModel.GetDeclaredSymbol(methodDeclarationSyntax);
 
+                // context.SemanticModel.Compilation.GetTypeByMetadataName(methodSymbol.ReturnType.GetType)
+
                 if (
                     methodSymbol
                         .GetAttributes()
@@ -31,6 +33,8 @@ namespace PersistentJobs.Generator
                         )
                 )
                 {
+                    var foo = methodSymbol.ReturnType.Name;
+
                     MethodsWithCreateDeferredAttribute.Add(methodSymbol);
                 }
             }

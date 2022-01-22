@@ -31,8 +31,8 @@ public class GeneratorTests
                     }
 
                     [CreateDeferred]
-                    private static Task DoSomething(Input input, AppDbContext dbContext) {
-                        return Task.CompletedTask;
+                    private static Task<int> DoSomething(Input input, AppDbContext dbContext) {
+                        return Task.FromResult(input + 5);;
                     }
 
                     [Foo]

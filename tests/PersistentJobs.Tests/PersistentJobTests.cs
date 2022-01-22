@@ -28,13 +28,6 @@ public partial class Worker
     {
         return Task.FromResult(input + 5);
     }
-
-    public static string UnmarkedMethod(Input input, DbContext dbContext)
-    {
-        // var jobs = dbContext.Set<PersistentJob>().ToArray();
-        // return jobs.Length;
-        return input.First + " " + input.Second;
-    }
 }
 
 public class TestDbContext : DbContext
@@ -51,7 +44,7 @@ public class TestDbContext : DbContext
 
 public class PersistentJobTests
 {
-    static public DbContext Create()
+    static public void Init()
     {
         var options =
             new DbContextOptionsBuilder<TestDbContext>().UseSqlite(
@@ -62,20 +55,59 @@ public class PersistentJobTests
         var context = new TestDbContext(options);
         context.Database.EnsureDeleted();
         context.Database.EnsureCreated();
+    }
+
+    static public DbContext CreateContext()
+    {
+        var options =
+            new DbContextOptionsBuilder<TestDbContext>().UseSqlite(
+                "DataSource=test.sqlite"
+            ).Options;
+
+        // Create the schema in the database
+        var context = new TestDbContext(options);
         return context;
     }
 
     [Fact]
     async public void TestService()
     {
-        var context = Create();
-        var services = new ServiceCollection();
-        services.AddSingleton(context);
-        var provider = services.BuildServiceProvider();
-        var service = new JobService(provider);
-        var deferred = await Worker.ExampleJobDeferred(42, context);
-        await service.RunAsync();
-        await PersistentJob.GotIt(context, deferred.Id);
+        Init();
+
+        DeferredTask<int> deferred;
+        // Http runs in own thread and scope, creates a deferred task
+        using (var httpDbContext = CreateContext())
+        {
+            deferred = await Worker.ExampleJobDeferred(42, httpDbContext);
+            await httpDbContext.SaveChangesAsync();
+        }
+
+        // Sometime later, the service runs the deferred tasks autonomusly (to
+        // speed things up we call it manually)
+        await Task.Run(
+            async () =>
+            {
+                // Background service runs in own thread and scope
+                var serviceScopedContext = CreateContext();
+                var services = new ServiceCollection();
+                services.AddScoped(
+                    (pr) =>
+                    {
+                        return CreateContext();
+                    }
+                );
+                var provider = services.BuildServiceProvider();
+                var service = new JobService(provider);
+                await service.RunAsync();
+            }
+        );
+
+        // Then user wants to look at the value
+        using (var httpDbContext = CreateContext())
+        {
+            var output = await deferred.GetOutput(httpDbContext);
+            Assert.Equal(42 + 5, output);
+        }
     }
 
 

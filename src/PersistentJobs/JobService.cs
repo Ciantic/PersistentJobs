@@ -10,33 +10,30 @@ namespace PersistentJobs;
 
 public class JobService : IHostedService
 {
-    private readonly TaskQueue Queue = new();
-    private readonly Dictionary<string, Delegate> _methods = new Dictionary<string, Delegate>();
-    private Timer _timer = null!;
-
+    private readonly TaskQueue _queue;
+    private readonly Dictionary<string, Delegate> _methods = new();
+    private Timer? _timer;
     private readonly IServiceProvider _services;
-
-    // public void Dispose()
-    // {
-    //     throw new NotImplementedException();
-    // }
 
     internal MethodInfo GetMethod(string methodName)
     {
         return _methods[methodName].GetMethodInfo();
     }
 
-    public JobService(IServiceProvider services) // TODO param Assembly[]
+    public JobService(IServiceProvider services)
     {
+        _queue = new(8);
+        _services = services;
+
         var methods = AppDomain.CurrentDomain
             .GetAssemblies()
             .SelectMany(t => t.GetTypes())
             .SelectMany(t => t.GetMethods())
-            .Where(m => m.GetCustomAttributes(typeof(IsDeferredAttribute), false).Length > 0)
-            .ToArray();
+            .Where(m => m.GetCustomAttributes(typeof(CreateDeferredAttribute), false).Length > 0);
+
         foreach (var method in methods)
         {
-            var key = method.Name.Replace("Deferred", "");
+            var key = method.Name;
             if (_methods.ContainsKey(key))
             {
                 throw new Exception("Only one with same name");
@@ -46,15 +43,12 @@ public class JobService : IHostedService
                 method.ReturnType
             };
             var dell = Delegate.CreateDelegate(Expression.GetFuncType(types.ToArray()), method);
-            // var dell = Delegate.CreateDelegate(Expression.GetDelegateType(types.ToArray()), method);
             _methods[key] = dell;
         }
-        _services = services;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        // Timer runs the callback `DoWork` in it's own thread
         _timer = new Timer(Tick, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
         return Task.CompletedTask;
     }
@@ -63,8 +57,8 @@ public class JobService : IHostedService
     {
         // TODO: For this to work right, one should not add anything to queue
         // after this
-        Queue.Cancel();
-        await Queue.Process();
+        _queue.Cancel();
+        await _queue.Process();
     }
 
     private async void Tick(object? state)
@@ -75,15 +69,31 @@ public class JobService : IHostedService
     public async Task RunAsync()
     {
         using var scope = _services.CreateScope();
-        // TODO: Life time of context?
-        var context = scope.ServiceProvider.GetRequiredService<DbContext>();
+        using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
 
-        // Pick one unstarted job and start it
+        // Get all unstarted work items
         var unstarted = await context
             .Set<PersistentJob>()
             .Where(p => p.Started == null)
-            .FirstAsync();
-        var method = _methods[unstarted.MethodName].GetMethodInfo();
-        unstarted?.Execute(context, method, _services);
+            .ToListAsync();
+
+        // Try to start each work item
+        foreach (var workitem in unstarted)
+        {
+            try
+            {
+                await workitem.Start(context);
+                var method = _methods[workitem.MethodName].GetMethodInfo();
+                _queue.Queue(
+                    () =>
+                    {
+                        return workitem.Execute(context, method, _services);
+                    }
+                );
+            }
+            catch (DBConcurrencyException) { }
+        }
+
+        await _queue.Process();
     }
 }
