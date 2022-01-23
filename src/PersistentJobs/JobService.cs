@@ -1,9 +1,5 @@
 using System.Data;
-using System.Dynamic;
-using System.Linq.Expressions;
 using System.Reflection;
-using System.Security.Cryptography;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -12,20 +8,20 @@ namespace PersistentJobs;
 
 public class JobService : IHostedService
 {
-    private readonly TaskQueue _queue;
-    private readonly Dictionary<string, Invokable> _methods = new();
-    private Timer? _timer;
-    private readonly IServiceProvider _services;
+    private readonly TaskQueue queue;
+    private readonly Dictionary<string, Invokable> methods = new();
+    private Timer? timer;
+    private readonly IServiceProvider services;
 
     internal Invokable GetMethod(string methodName)
     {
-        return _methods[methodName];
+        return methods[methodName];
     }
 
     public JobService(IServiceProvider services)
     {
-        _queue = new(8);
-        _services = services;
+        queue = new(8);
+        this.services = services;
 
         var methods = AppDomain.CurrentDomain
             .GetAssemblies()
@@ -36,7 +32,7 @@ public class JobService : IHostedService
         foreach (var method in methods)
         {
             var key = method.Name;
-            if (_methods.ContainsKey(key))
+            if (this.methods.ContainsKey(key))
             {
                 throw new Exception("Only one with same name");
             }
@@ -44,10 +40,9 @@ public class JobService : IHostedService
             {
                 method.ReturnType
             };
-            // var del = Delegate.CreateDelegate(Expression.GetFuncType(types.ToArray()), method);
             var parameters = method.GetParameters();
             var inputPar = parameters.First();
-            _methods[key] = new Invokable(
+            this.methods[key] = new Invokable(
                 method,
                 inputType: inputPar.ParameterType,
                 serviceTypes: parameters.Skip(1).Select(t => t.ParameterType).ToArray()
@@ -57,7 +52,7 @@ public class JobService : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _timer = new Timer(Tick, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+        timer = new Timer(Tick, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
         return Task.CompletedTask;
     }
 
@@ -65,8 +60,8 @@ public class JobService : IHostedService
     {
         // TODO: For this to work right, one should not add anything to queue
         // after this
-        _queue.Cancel();
-        await _queue.Process();
+        queue.Cancel();
+        await queue.Process();
     }
 
     private async void Tick(object? state)
@@ -76,7 +71,7 @@ public class JobService : IHostedService
 
     public async Task RunAsync()
     {
-        using var scope = _services.CreateScope();
+        using var scope = services.CreateScope();
         using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
 
         var unstarted = await PersistentJob.Repository.GetUnstarted(context);
@@ -84,15 +79,15 @@ public class JobService : IHostedService
         // Try to start each work item
         foreach (var workitem in unstarted)
         {
-            var invokable = _methods[workitem.MethodName];
+            var invokable = methods[workitem.MethodName];
             try
             {
                 // Try to start and queue
                 var inputObject = await workitem.Start(context, invokable.inputType);
-                _queue.Queue(
+                queue.Queue(
                     async () =>
                     {
-                        var outputObject = await invokable.Invoke(inputObject, _services);
+                        var outputObject = await invokable.Invoke(inputObject, services);
                         await workitem.Complete(context, outputObject);
                     }
                 );
@@ -103,7 +98,7 @@ public class JobService : IHostedService
             }
         }
 
-        await _queue.Process();
+        await queue.Process();
     }
 
     internal record Invokable(MethodInfo method, Type inputType, Type[] serviceTypes)

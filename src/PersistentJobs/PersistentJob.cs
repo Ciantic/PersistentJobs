@@ -1,17 +1,7 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
-using System.ComponentModel.Design.Serialization;
-using System.Data;
-using System.Diagnostics.Metrics;
+﻿using System.Data;
 using System.Reflection;
-using System.Reflection.Metadata.Ecma335;
-using System.Security.AccessControl;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using static PersistentJobs.JobService;
 
 namespace PersistentJobs;
 
@@ -105,24 +95,12 @@ internal class PersistentJob
         return outputValue;
     }
 
-    static private PersistentJob CreateFromMethod(Delegate d, object input)
+    static private PersistentJob CreateFromMethod(Delegate methodDelegate, object input)
     {
-        var method = d.GetMethodInfo();
-        var assemblyName = method.DeclaringType?.Assembly.GetName().Name;
-        var className = method.DeclaringType?.FullName;
+        var method = methodDelegate.GetMethodInfo();
         var methodName = method.Name;
-        if (assemblyName == null)
-        {
-            throw new ArgumentException("Assembly not determined");
-        }
-        if (className == null)
-        {
-            throw new ArgumentException("Class not determined");
-        }
         return new PersistentJob()
         {
-            // AssemblyName = assemblyName,
-            // ClassName = className,
             MethodName = methodName,
             InputJson = JsonSerializer.Serialize(input)
         };
