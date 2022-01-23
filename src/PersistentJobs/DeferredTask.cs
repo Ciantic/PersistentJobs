@@ -14,11 +14,6 @@ public class DeferredTask<Output>
 
     async public Task<Output?> GetOutput(DbContext context)
     {
-        var output = await PersistentJob.Repository.GetOutputById(context, Id);
-        if (output == null)
-        {
-            return default;
-        }
-        return JsonSerializer.Deserialize<Output>(output);
+        return await PersistentJob.Repository.GetOutputById<Output>(context, Id);
     }
 }

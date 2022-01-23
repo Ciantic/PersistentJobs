@@ -47,12 +47,11 @@ public class JobService : IHostedService
             // var del = Delegate.CreateDelegate(Expression.GetFuncType(types.ToArray()), method);
             var parameters = method.GetParameters();
             var inputPar = parameters.First();
-            _methods[key] = new Invokable()
-            {
-                method = method,
-                inputType = inputPar.ParameterType,
-                serviceTypes = parameters.Skip(1).Select(t => t.ParameterType).ToArray()
-            };
+            _methods[key] = new Invokable(
+                method,
+                inputType: inputPar.ParameterType,
+                serviceTypes: parameters.Skip(1).Select(t => t.ParameterType).ToArray()
+            );
         }
     }
 
@@ -85,20 +84,14 @@ public class JobService : IHostedService
         // Try to start each work item
         foreach (var workitem in unstarted)
         {
+            var invokable = _methods[workitem.MethodName];
             try
             {
-                // Try to start
-                var inputJson = await workitem.Start(context);
-
-                // Queue the task
-                var invokable = _methods[workitem.MethodName];
+                // Try to start and queue
+                var inputObject = await workitem.Start(context, invokable.inputType);
                 _queue.Queue(
                     async () =>
                     {
-                        var inputObject = JsonSerializer.Deserialize(
-                            inputJson,
-                            invokable.inputType
-                        );
                         var outputObject = await invokable.Invoke(inputObject, _services);
                         await workitem.Complete(context, outputObject);
                     }
@@ -113,14 +106,8 @@ public class JobService : IHostedService
         await _queue.Process();
     }
 
-    internal record Invokable
+    internal record Invokable(MethodInfo method, Type inputType, Type[] serviceTypes)
     {
-        // internal Delegate del;
-
-        internal MethodInfo method;
-        internal Type inputType;
-        internal Type[] serviceTypes;
-
         async public Task<object> Invoke(object? input, IServiceProvider? serviceProvider = null)
         {
             var invokeParams = new List<object?>() { input };
@@ -138,12 +125,6 @@ public class JobService : IHostedService
             // TODO: Maybe the calling function could provide accurate type here?
             return ((dynamic)outputTask).Result as object;
         }
-    }
-
-    internal Invokable GetInvokable()
-    {
-        var a = new Invokable() { };
-        throw new NotImplementedException();
     }
 
     public async static Task<DeferredTask<O>> AddTask<O>(

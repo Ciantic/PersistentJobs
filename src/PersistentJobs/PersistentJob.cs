@@ -43,14 +43,19 @@ internal class PersistentJob
 
     internal static class Repository
     {
-        async static internal Task<string?> GetOutputById(DbContext context, Guid id)
+        async static internal Task<Output?> GetOutputById<Output>(DbContext context, Guid id)
         {
-            return (
+            var json = (
                 await context
                     .Set<PersistentJob>()
                     .Where(p => p.Id == id && p.OutputJson != null)
                     .FirstOrDefaultAsync()
             )?.OutputJson;
+            if (json == null)
+            {
+                return default;
+            }
+            return JsonSerializer.Deserialize<Output>(json);
         }
 
         async static internal Task<List<PersistentJob>> GetUnstarted(DbContext context)
@@ -71,12 +76,25 @@ internal class PersistentJob
         }
     }
 
-    async internal Task<string> Start(DbContext context)
+    async internal Task<object?> Start(DbContext context, Type inputType)
     {
+        object? inputObject;
+        try
+        {
+            inputObject = JsonSerializer.Deserialize(InputJson, inputType);
+        }
+        catch (JsonException)
+        {
+            throw new ArgumentException(
+                "Unable to serialize to given input type",
+                nameof(inputType)
+            );
+        }
+
         Started = DateTime.UtcNow;
         IdempotencyKey = Guid.NewGuid();
         await context.SaveChangesAsync();
-        return InputJson;
+        return inputObject;
     }
 
     async internal Task<object?> Complete(DbContext context, object outputValue)
