@@ -13,24 +13,69 @@ using Microsoft.Extensions.Options;
 
 namespace PersistentJobs;
 
-public class PersistentJob
+internal class PersistentJob
 {
-    internal Guid Id { get; set; } = Guid.NewGuid();
+    private Guid Id { get; set; } = Guid.NewGuid();
 
-    // internal string AssemblyName { get; set; } = "";
-    // internal string ClassName { get; set; } = "";
+    // private string AssemblyName { get; set; } = "";
+    // private string ClassName { get; set; } = "";
     internal string MethodName { get; set; } = "";
-    internal string InputJson { get; set; } = "";
-    internal string? OutputJson { get; set; } = null;
-    internal DateTime Created { get; set; } = DateTime.UtcNow;
-    internal DateTime? Started { get; set; } = null;
-    internal DateTime? Ended { get; set; } = null;
-    internal TimeSpan TimeLimit { get; set; } = TimeSpan.FromMinutes(30);
-    internal Guid IdempotencyKey { get; set; } = Guid.NewGuid();
+    private string InputJson { get; set; } = "";
+    private string? OutputJson { get; set; } = null;
+    private DateTime Created { get; set; } = DateTime.UtcNow;
+    private DateTime? Started { get; set; } = null;
+    private DateTime? Ended { get; set; } = null;
+    private TimeSpan TimeLimit { get; set; } = TimeSpan.FromMinutes(30);
+    private Guid IdempotencyKey { get; set; } = Guid.NewGuid();
+
+    internal static void ConfigureModelBuilder(ModelBuilder modelBuilder)
+    {
+        var model = modelBuilder.Entity<PersistentJob>();
+        model.Property(p => p.Id);
+        model.Property(p => p.MethodName);
+        model.Property(p => p.InputJson);
+        model.Property(p => p.OutputJson);
+        model.Property(p => p.Created);
+        model.Property(p => p.Started);
+        model.Property(p => p.Ended);
+        model.Property(p => p.TimeLimit);
+        model.Property(p => p.IdempotencyKey).IsConcurrencyToken();
+    }
+
+    internal static class Repository
+    {
+        async static internal Task<string?> GetOutputById(DbContext context, Guid id)
+        {
+            return (
+                await context
+                    .Set<PersistentJob>()
+                    .Where(p => p.Id == id && p.OutputJson != null)
+                    .FirstOrDefaultAsync()
+            )?.OutputJson;
+        }
+
+        async static internal Task<List<PersistentJob>> GetUnstarted(DbContext context)
+        {
+            // Get all unstarted work items
+            return await context.Set<PersistentJob>().Where(p => p.Started == null).ToListAsync();
+        }
+
+        internal async static Task<DeferredTask<O>> Insert<O>(
+            DbContext context,
+            Delegate method,
+            object input
+        )
+        {
+            var job = CreateFromMethod(method, input);
+            await context.Set<PersistentJob>().AddAsync(job);
+            return new DeferredTask<O>(job.Id);
+        }
+    }
 
     async internal Task Start(DbContext context)
     {
         Started = DateTime.UtcNow;
+        IdempotencyKey = Guid.NewGuid();
         try
         {
             await context.SaveChangesAsync();
@@ -76,6 +121,7 @@ public class PersistentJob
         var outputValue = ((dynamic)outputTask).Result;
 
         OutputJson = JsonSerializer.Serialize(outputValue);
+        IdempotencyKey = Guid.NewGuid();
         var changed = await context.SaveChangesAsync();
         return outputValue;
     }
@@ -101,26 +147,5 @@ public class PersistentJob
             MethodName = methodName,
             InputJson = JsonSerializer.Serialize(input)
         };
-    }
-
-    /// <summary>
-    /// Insert the job to context (does not save it)
-    /// 
-    /// This behavior allows to add tasks transactionally.
-    /// </summary>
-    /// <param name="context"></param>
-    /// <param name="method"></param>
-    /// <param name="input"></param>
-    /// <typeparam name="O"></typeparam>
-    /// <returns></returns>
-    public async static Task<DeferredTask<O>> Insert<O>(
-        DbContext context,
-        Delegate method,
-        object input
-    )
-    {
-        var job = CreateFromMethod(method, input);
-        await context.Set<PersistentJob>().AddAsync(job);
-        return new DeferredTask<O>(job.Id);
     }
 }

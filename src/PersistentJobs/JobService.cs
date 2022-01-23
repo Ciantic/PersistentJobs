@@ -71,11 +71,7 @@ public class JobService : IHostedService
         using var scope = _services.CreateScope();
         using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
 
-        // Get all unstarted work items
-        var unstarted = await context
-            .Set<PersistentJob>()
-            .Where(p => p.Started == null)
-            .ToListAsync();
+        var unstarted = await PersistentJob.Repository.GetUnstarted(context);
 
         // Try to start each work item
         foreach (var workitem in unstarted)
@@ -95,5 +91,14 @@ public class JobService : IHostedService
         }
 
         await _queue.Process();
+    }
+
+    public async static Task<DeferredTask<O>> AddTask<O>(
+        DbContext context,
+        Delegate method,
+        object input
+    )
+    {
+        return await PersistentJob.Repository.Insert<O>(context, method, input);
     }
 }

@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 
 namespace PersistentJobs;
 
-public class TaskQueue
+internal class TaskQueue
 {
     public class QueueLimitReachedException : Exception
     {

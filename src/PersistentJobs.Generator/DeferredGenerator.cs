@@ -75,7 +75,7 @@ namespace PersistentJobs.Generator
                                 Microsoft.EntityFrameworkCore.DbContext context
                             ) 
                             {{
-                                return await PersistentJob.Insert<{outputTypeName}>(context, {methodName}, input);
+                                return await JobService.AddTask<{outputTypeName}>(context, {methodName}, input);
                             }}
                         }}
                     }}
