@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.Design.Serialization;
 using System.Data;
 using System.Diagnostics.Metrics;
 using System.Reflection;
@@ -10,15 +11,13 @@ using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using static PersistentJobs.JobService;
 
 namespace PersistentJobs;
 
 internal class PersistentJob
 {
     private Guid Id { get; set; } = Guid.NewGuid();
-
-    // private string AssemblyName { get; set; } = "";
-    // private string ClassName { get; set; } = "";
     internal string MethodName { get; set; } = "";
     private string InputJson { get; set; } = "";
     private string? OutputJson { get; set; } = null;
@@ -72,57 +71,19 @@ internal class PersistentJob
         }
     }
 
-    async internal Task Start(DbContext context)
+    async internal Task<string> Start(DbContext context)
     {
         Started = DateTime.UtcNow;
         IdempotencyKey = Guid.NewGuid();
-        try
-        {
-            await context.SaveChangesAsync();
-        }
-        catch (DBConcurrencyException) { }
+        await context.SaveChangesAsync();
+        return InputJson;
     }
 
-    async internal Task<object?> Execute(
-        DbContext context,
-        MethodInfo method,
-        IServiceProvider? serviceProvider = null
-    )
+    async internal Task<object?> Complete(DbContext context, object outputValue)
     {
-        // var method = jobService.GetMethod(MethodName);
-
-        // TODO: input and services should be cached on the JobService:
-        var parameters = method.GetParameters();
-
-        // Get input parameter
-        var inputPar = parameters.First();
-        if (inputPar.Name != "input")
-        {
-            throw new Exception("First parameter is required to be `input`");
-        }
-        var inputValue = JsonSerializer.Deserialize(InputJson, inputPar.ParameterType);
-        var invokeParams = new List<object?>() { inputValue };
-
-        // Get service parameters
-        if (serviceProvider != null)
-        {
-            var serviceTypes = parameters.Skip(1).ToArray();
-            var services = serviceTypes.Select(
-                p => serviceProvider.GetRequiredService(p.ParameterType)
-            );
-            invokeParams.AddRange(services);
-        }
-
-        // Execute and store to OutputJson, some reason Task<_> is not castable to Task<object>
-        Task outputTask = (Task)method.Invoke(null, invokeParams.ToArray())!;
-        await outputTask.ConfigureAwait(false);
-
-        // TODO: Maybe the calling function could provide accurate type here?
-        var outputValue = ((dynamic)outputTask).Result;
-
         OutputJson = JsonSerializer.Serialize(outputValue);
         IdempotencyKey = Guid.NewGuid();
-        var changed = await context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return outputValue;
     }
 

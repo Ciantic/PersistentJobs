@@ -1,7 +1,9 @@
 using System.Data;
+using System.Dynamic;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -11,13 +13,13 @@ namespace PersistentJobs;
 public class JobService : IHostedService
 {
     private readonly TaskQueue _queue;
-    private readonly Dictionary<string, Delegate> _methods = new();
+    private readonly Dictionary<string, Invokable> _methods = new();
     private Timer? _timer;
     private readonly IServiceProvider _services;
 
-    internal MethodInfo GetMethod(string methodName)
+    internal Invokable GetMethod(string methodName)
     {
-        return _methods[methodName].GetMethodInfo();
+        return _methods[methodName];
     }
 
     public JobService(IServiceProvider services)
@@ -42,8 +44,15 @@ public class JobService : IHostedService
             {
                 method.ReturnType
             };
-            var dell = Delegate.CreateDelegate(Expression.GetFuncType(types.ToArray()), method);
-            _methods[key] = dell;
+            // var del = Delegate.CreateDelegate(Expression.GetFuncType(types.ToArray()), method);
+            var parameters = method.GetParameters();
+            var inputPar = parameters.First();
+            _methods[key] = new Invokable()
+            {
+                method = method,
+                inputType = inputPar.ParameterType,
+                serviceTypes = parameters.Skip(1).Select(t => t.ParameterType).ToArray()
+            };
         }
     }
 
@@ -78,19 +87,63 @@ public class JobService : IHostedService
         {
             try
             {
-                await workitem.Start(context);
-                var method = _methods[workitem.MethodName].GetMethodInfo();
+                // Try to start
+                var inputJson = await workitem.Start(context);
+
+                // Queue the task
+                var invokable = _methods[workitem.MethodName];
                 _queue.Queue(
-                    () =>
+                    async () =>
                     {
-                        return workitem.Execute(context, method, _services);
+                        var inputObject = JsonSerializer.Deserialize(
+                            inputJson,
+                            invokable.inputType
+                        );
+                        var outputObject = await invokable.Invoke(inputObject, _services);
+                        await workitem.Complete(context, outputObject);
                     }
                 );
             }
-            catch (DBConcurrencyException) { }
+            catch (DBConcurrencyException)
+            {
+                // Some other process managed to snatch the task
+            }
         }
 
         await _queue.Process();
+    }
+
+    internal record Invokable
+    {
+        // internal Delegate del;
+
+        internal MethodInfo method;
+        internal Type inputType;
+        internal Type[] serviceTypes;
+
+        async public Task<object> Invoke(object? input, IServiceProvider? serviceProvider = null)
+        {
+            var invokeParams = new List<object?>() { input };
+
+            // Get service parameters
+            if (serviceProvider != null)
+            {
+                var services = serviceTypes.Select(p => serviceProvider.GetRequiredService(p));
+                invokeParams.AddRange(services);
+            }
+
+            Task outputTask = (Task)method.Invoke(null, invokeParams.ToArray())!;
+            await outputTask.ConfigureAwait(false);
+
+            // TODO: Maybe the calling function could provide accurate type here?
+            return ((dynamic)outputTask).Result as object;
+        }
+    }
+
+    internal Invokable GetInvokable()
+    {
+        var a = new Invokable() { };
+        throw new NotImplementedException();
     }
 
     public async static Task<DeferredTask<O>> AddTask<O>(
