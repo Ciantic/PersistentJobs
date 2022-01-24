@@ -27,7 +27,7 @@ public class JobService : IHostedService
             .GetAssemblies()
             .SelectMany(t => t.GetTypes())
             .SelectMany(t => t.GetMethods())
-            .Where(m => m.GetCustomAttributes(typeof(CreateDeferredAttribute), false).Length > 0);
+            .Where(m => m.GetCustomAttributes(typeof(JobAttribute), false).Length > 0);
 
         foreach (var method in methods)
         {
