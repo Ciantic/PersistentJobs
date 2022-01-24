@@ -51,7 +51,7 @@ public class JobService : IHostedService
         using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
         var unstarted = await PersistentJob.Repository.GetUnstarted(context);
 
-        // Try to start each work item
+        // Start and queue each work item
         foreach (var workitem in unstarted)
         {
             var invokable = methods[workitem.MethodName];
@@ -85,6 +85,7 @@ public class JobService : IHostedService
             }
         }
 
+        // Awaits until the queue is completed
         await queue.Process();
     }
 
