@@ -13,51 +13,16 @@ public class JobService : IHostedService
     private Timer? timer;
     private readonly IServiceProvider services;
 
-    internal Invokable GetMethod(string methodName)
+    public record JobServiceOpts(int maxParallelizationCount = 8)
     {
-        return methods[methodName];
     }
 
-    public JobService(IServiceProvider services)
+    public JobService(JobServiceOpts opts, IServiceProvider services)
     {
-        queue = new(8);
+        // TODO: Configurable parallelization count
+        queue = new(opts.maxParallelizationCount);
         this.services = services;
-
-        var methods = AppDomain.CurrentDomain
-            .GetAssemblies()
-            .SelectMany(t => t.GetTypes())
-            .SelectMany(t => t.GetMethods())
-            .Where(m => m.GetCustomAttributes(typeof(JobAttribute), false).Length > 0);
-
-        foreach (var method in methods)
-        {
-            var key = method.Name;
-
-            if (!method.IsStatic)
-            {
-                throw new Exception("Persistent jobs work only on static methods.");
-            }
-
-            if (this.methods.ContainsKey(key))
-            {
-                throw new Exception(
-                    $"Persistent job methods need to be unique, job with name '{key}' is already defined."
-                );
-            }
-
-            var types = new List<Type>(method.GetParameters().Select(p => p.ParameterType))
-            {
-                method.ReturnType
-            };
-
-            var parameters = method.GetParameters();
-            var inputPar = parameters.First();
-            this.methods[key] = new Invokable(
-                method,
-                inputType: inputPar.ParameterType,
-                serviceTypes: parameters.Skip(1).Select(t => t.ParameterType).ToArray()
-            );
-        }
+        methods = BuildMethodsCache();
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -81,9 +46,9 @@ public class JobService : IHostedService
 
     public async Task RunAsync()
     {
+        // List<PersistentJob> unstarted;
         using var scope = services.CreateScope();
         using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
-
         var unstarted = await PersistentJob.Repository.GetUnstarted(context);
 
         // Try to start each work item
@@ -94,9 +59,21 @@ public class JobService : IHostedService
             {
                 // Try to start and queue
                 var inputObject = await workitem.Start(context, invokable.inputType);
+
+                // The workitem is sent to different thread, so I detach here
+                context.Entry(workitem).State = EntityState.Detached;
+
                 queue.Queue(
                     async () =>
                     {
+                        // This is run in it's own thread, and needs a new scope
+                        using var scope = services.CreateScope();
+                        using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
+
+                        // Attaches the persistent job to this context instead
+                        context.Attach(workitem);
+
+                        // Invoke and complete
                         var outputObject = await invokable.Invoke(inputObject, services);
                         await workitem.Complete(context, outputObject);
                     }
@@ -139,5 +116,47 @@ public class JobService : IHostedService
     )
     {
         return await PersistentJob.Repository.Insert<O>(context, method, input);
+    }
+
+    private static Dictionary<string, Invokable> BuildMethodsCache()
+    {
+        Dictionary<string, Invokable> cache = new();
+
+        var methods = AppDomain.CurrentDomain
+            .GetAssemblies()
+            .SelectMany(t => t.GetTypes())
+            .SelectMany(t => t.GetMethods())
+            .Where(m => m.GetCustomAttributes(typeof(JobAttribute), false).Length > 0);
+
+        foreach (var method in methods)
+        {
+            var key = method.Name;
+
+            if (!method.IsStatic)
+            {
+                throw new Exception("Persistent jobs work only on static methods.");
+            }
+
+            if (cache.ContainsKey(key))
+            {
+                throw new Exception(
+                    $"Persistent job methods need to be unique, job with name '{key}' is already defined."
+                );
+            }
+
+            var types = new List<Type>(method.GetParameters().Select(p => p.ParameterType))
+            {
+                method.ReturnType
+            };
+
+            var parameters = method.GetParameters();
+            var inputPar = parameters.First();
+            cache[key] = new Invokable(
+                method,
+                inputType: inputPar.ParameterType,
+                serviceTypes: parameters.Skip(1).Select(t => t.ParameterType).ToArray()
+            );
+        }
+        return cache;
     }
 }

@@ -88,7 +88,6 @@ public class PersistentJobTests
             async () =>
             {
                 // Background service runs in own thread and scope
-                var serviceScopedContext = CreateContext();
                 var services = new ServiceCollection();
                 services.AddScoped(
                     (pr) =>
@@ -97,8 +96,9 @@ public class PersistentJobTests
                     }
                 );
                 var provider = services.BuildServiceProvider();
-                var service = new JobService(provider);
+                var service = new JobService(opts: new(), provider);
                 await service.RunAsync();
+                Console.WriteLine("Ran");
             }
         );
 
