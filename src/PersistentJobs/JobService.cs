@@ -13,14 +13,14 @@ public class JobService : IHostedService
     private Timer? timer;
     private readonly IServiceProvider services;
 
-    public record JobServiceOpts(int maxParallelizationCount = 8)
+    public record JobServiceOpts(int MaxParallelizationCount = 8)
     {
     }
 
     public JobService(JobServiceOpts opts, IServiceProvider services)
     {
         // TODO: Configurable parallelization count
-        queue = new(opts.maxParallelizationCount);
+        queue = new(opts.MaxParallelizationCount);
         this.services = services;
         methods = BuildMethodsCache();
     }
