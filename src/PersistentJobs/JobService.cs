@@ -32,14 +32,24 @@ public class JobService : IHostedService
         foreach (var method in methods)
         {
             var key = method.Name;
+
+            if (!method.IsStatic)
+            {
+                throw new Exception("Persistent jobs work only on static methods.");
+            }
+
             if (this.methods.ContainsKey(key))
             {
-                throw new Exception("Only one with same name");
+                throw new Exception(
+                    $"Persistent job methods need to be unique, job with name '{key}' is already defined."
+                );
             }
+
             var types = new List<Type>(method.GetParameters().Select(p => p.ParameterType))
             {
                 method.ReturnType
             };
+
             var parameters = method.GetParameters();
             var inputPar = parameters.First();
             this.methods[key] = new Invokable(
