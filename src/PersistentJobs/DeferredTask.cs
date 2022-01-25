@@ -13,6 +13,6 @@ public class DeferredTask<Output>
 
     async public Task<Output?> GetOutput(DbContext context)
     {
-        return await PersistentJob.Repository.GetOutputById<Output>(context, Id);
+        return await PersistentJob.Repository.GetCompletedOutput<Output>(context, Id);
     }
 }

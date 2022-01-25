@@ -37,14 +37,15 @@ internal class PersistentJob
 
     internal static class Repository
     {
-        async static internal Task<Output?> GetOutputById<Output>(DbContext context, Guid id)
+        async static internal Task<Output?> GetCompletedOutput<Output>(DbContext context, Guid id)
         {
             var json = (
                 await context
                     .Set<PersistentJob>()
-                    .Where(p => p.Id == id && p.OutputJson != null)
+                    .Where(p => p.Id == id && p.Completed != null)
                     .FirstOrDefaultAsync()
             )?.OutputJson;
+
             if (json == null)
             {
                 return default;
