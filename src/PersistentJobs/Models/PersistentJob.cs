@@ -12,10 +12,14 @@ internal class PersistentJob
     private string InputJson { get; set; } = "";
     private string? OutputJson { get; set; } = null;
     private DateTime Created { get; set; } = DateTime.UtcNow;
-    private DateTime? Started { get; set; } = null;
-    private DateTime? Ended { get; set; } = null;
+    private DateTime? Queued { get; set; } = null;
+    private DateTime? Completed { get; set; } = null;
     private TimeSpan TimeLimit { get; set; } = TimeSpan.FromMinutes(30);
-    private Guid IdempotencyKey { get; set; } = Guid.NewGuid();
+    private uint Retry { get; set; } = 0;
+    private uint MaxRetries { get; set; } = 0;
+    private Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
+
+    private PersistentJob() { }
 
     internal static void ConfigureModelBuilder(ModelBuilder modelBuilder)
     {
@@ -25,10 +29,10 @@ internal class PersistentJob
         model.Property(p => p.InputJson);
         model.Property(p => p.OutputJson);
         model.Property(p => p.Created);
-        model.Property(p => p.Started);
-        model.Property(p => p.Ended);
+        model.Property(p => p.Queued);
+        model.Property(p => p.Completed);
         model.Property(p => p.TimeLimit);
-        model.Property(p => p.IdempotencyKey).IsConcurrencyToken();
+        model.Property(p => p.ConcurrencyStamp).IsConcurrencyToken();
     }
 
     internal static class Repository
@@ -48,10 +52,10 @@ internal class PersistentJob
             return JsonSerializer.Deserialize<Output>(json);
         }
 
-        async static internal Task<List<PersistentJob>> GetUnstarted(DbContext context)
+        async static internal Task<List<PersistentJob>> GetAvailable(DbContext context)
         {
             // Get all unstarted work items
-            return await context.Set<PersistentJob>().Where(p => p.Started == null).ToListAsync();
+            return await context.Set<PersistentJob>().Where(p => p.Queued == null).ToListAsync();
         }
 
         internal async static Task<DeferredTask<O>> Insert<O>(
@@ -66,7 +70,7 @@ internal class PersistentJob
         }
     }
 
-    async internal Task<object?> Start(DbContext context, Type inputType)
+    async internal Task<object?> Queue(DbContext context, Type inputType)
     {
         object? inputObject;
         try
@@ -81,8 +85,8 @@ internal class PersistentJob
             );
         }
 
-        Started = DateTime.UtcNow;
-        IdempotencyKey = Guid.NewGuid();
+        Queued = DateTime.UtcNow;
+        ConcurrencyStamp = Guid.NewGuid();
         await context.SaveChangesAsync();
         return inputObject;
     }
@@ -90,7 +94,8 @@ internal class PersistentJob
     async internal Task<object?> Complete(DbContext context, object outputValue)
     {
         OutputJson = JsonSerializer.Serialize(outputValue);
-        IdempotencyKey = Guid.NewGuid();
+        Completed = DateTime.UtcNow;
+        ConcurrencyStamp = Guid.NewGuid();
         await context.SaveChangesAsync();
         return outputValue;
     }

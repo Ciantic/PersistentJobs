@@ -49,16 +49,16 @@ public class JobService : IHostedService
         // List<PersistentJob> unstarted;
         using var scope = services.CreateScope();
         using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
-        var unstarted = await PersistentJob.Repository.GetUnstarted(context);
+        var availableJobs = await PersistentJob.Repository.GetAvailable(context);
 
         // Start and queue each work item
-        foreach (var workitem in unstarted)
+        foreach (var workitem in availableJobs)
         {
             var invokable = methods[workitem.MethodName];
             try
             {
                 // Try to start and queue
-                var inputObject = await workitem.Start(context, invokable.inputType);
+                var inputObject = await workitem.Queue(context, invokable.inputType);
 
                 // The workitem is sent to different thread, so I detach here
                 context.Entry(workitem).State = EntityState.Detached;
