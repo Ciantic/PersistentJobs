@@ -11,8 +11,39 @@ public class DeferredTask<Output>
         Id = taskId;
     }
 
-    async public Task<Output?> GetOutput(DbContext context)
+    async public Task<Output> GetOutput(DbContext context)
     {
-        return await PersistentJob.Repository.GetCompletedOutput<Output>(context, Id);
+        try
+        {
+            var output = await PersistentJob.Repository.GetCompletedOutput<Output>(context, Id);
+
+            // If output *is* nullable, then returning null is fine
+            if (Nullable.GetUnderlyingType(typeof(Output)) != null)
+            {
+                return output!;
+            }
+            else
+            {
+                // Output type is nullable, but it contains null, this is violation
+                if (output == null)
+                {
+                    throw new Exception("Output type should not be null");
+                }
+            }
+
+            return output;
+        }
+        catch (PersistentJob.Repository.ObjectNotFoundException)
+        {
+            throw new ObjectNotFoundException();
+        }
+
+
+    }
+
+    [Serializable]
+    public class ObjectNotFoundException : Exception
+    {
+        public ObjectNotFoundException() { }
     }
 }

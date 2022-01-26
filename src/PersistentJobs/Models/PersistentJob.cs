@@ -1,5 +1,6 @@
 ﻿using System.Data;
 using System.Reflection;
+using System.Runtime.Serialization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
@@ -44,13 +45,16 @@ internal class PersistentJob
                     .Set<PersistentJob>()
                     .Where(p => p.Id == id && p.Completed != null)
                     .FirstOrDefaultAsync()
-            )?.OutputJson;
-
+            );
             if (json == null)
+            {
+                throw new ObjectNotFoundException();
+            }
+            if (json.OutputJson == null)
             {
                 return default;
             }
-            return JsonSerializer.Deserialize<Output>(json);
+            return JsonSerializer.Deserialize<Output>(json.OutputJson);
         }
 
         async static internal Task<List<PersistentJob>> GetAvailable(DbContext context)
@@ -68,6 +72,12 @@ internal class PersistentJob
             var job = CreateFromMethod(method, input);
             await context.Set<PersistentJob>().AddAsync(job);
             return new DeferredTask<O>(job.Id);
+        }
+
+        [Serializable]
+        internal class ObjectNotFoundException : Exception
+        {
+            internal ObjectNotFoundException() { }
         }
     }
 
