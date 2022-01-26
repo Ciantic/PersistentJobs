@@ -29,7 +29,6 @@ namespace PersistentJobs.Generator
             }
 
             var m = receiver.MethodsWithCreateDeferredAttribute.FirstOrDefault();
-            var assemblyName = m.ContainingAssembly.ToDisplayString();
             var inputTypeName = m.Parameters[0].Type.ToDisplayString();
             var namespaceName = m.ContainingNamespace.ToDisplayString();
             var className = m.ContainingType.Name;

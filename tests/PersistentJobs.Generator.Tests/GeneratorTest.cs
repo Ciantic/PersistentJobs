@@ -80,11 +80,11 @@ public class GeneratorTests
         // );
 
         GeneratorDriverRunResult runResult = driver.GetRunResult();
-        var text = runResult.GeneratedTrees.First().GetText();
+        // var text = runResult.GeneratedTrees.First().GetText();
 
-        var attributeSymbol = outputCompilation.GetTypeByMetadataName(
-            "PersistentJobs.CreateDeferredAttribute"
-        );
+        // var attributeSymbol = outputCompilation.GetTypeByMetadataName(
+        //     "PersistentJobs.CreateDeferredAttribute"
+        // );
 
         Assert.Equal(3, outputCompilation.SyntaxTrees.Count());
         Assert.True(diagnostics.IsEmpty);

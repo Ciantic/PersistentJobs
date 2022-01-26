@@ -98,7 +98,6 @@ public class PersistentJobTests
                 var provider = services.BuildServiceProvider();
                 var service = new JobService(opts: new(), provider);
                 await service.RunAsync();
-                Console.WriteLine("Ran");
             }
         );
 

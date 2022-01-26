@@ -58,7 +58,7 @@ public class JobService : IHostedService
             try
             {
                 // Try to start and queue
-                var inputObject = await workitem.Queue(context, invokable.inputType);
+                var inputObject = await workitem.Queue(context, invokable.InputType);
 
                 // The workitem is sent to different thread, so I detach here
                 context.Entry(workitem).State = EntityState.Detached;
@@ -89,7 +89,7 @@ public class JobService : IHostedService
         await queue.Process();
     }
 
-    internal record Invokable(MethodInfo method, Type inputType, Type[] serviceTypes)
+    internal record Invokable(MethodInfo Method, Type InputType, Type[] ServiceTypes)
     {
         async public Task<object> Invoke(object? input, IServiceProvider? serviceProvider = null)
         {
@@ -98,11 +98,11 @@ public class JobService : IHostedService
             // Get service parameters
             if (serviceProvider != null)
             {
-                var services = serviceTypes.Select(p => serviceProvider.GetRequiredService(p));
+                var services = ServiceTypes.Select(p => serviceProvider.GetRequiredService(p));
                 invokeParams.AddRange(services);
             }
 
-            Task outputTask = (Task)method.Invoke(null, invokeParams.ToArray())!;
+            Task outputTask = (Task)Method.Invoke(null, invokeParams.ToArray())!;
             await outputTask.ConfigureAwait(false);
 
             // TODO: Maybe the calling function could provide accurate type here?
@@ -154,8 +154,8 @@ public class JobService : IHostedService
             var inputPar = parameters.First();
             cache[key] = new Invokable(
                 method,
-                inputType: inputPar.ParameterType,
-                serviceTypes: parameters.Skip(1).Select(t => t.ParameterType).ToArray()
+                InputType: inputPar.ParameterType,
+                ServiceTypes: parameters.Skip(1).Select(t => t.ParameterType).ToArray()
             );
         }
         return cache;
