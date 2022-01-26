@@ -24,13 +24,14 @@ public class DeferredTask<Output>
             }
             else
             {
-                // Output type is nullable, but it contains null, this is violation
+                // Output type is not nullable, but it contains null, this is violation
                 if (output == null)
                 {
-                    throw new Exception("Output type should not be null");
+                    throw new Exception(
+                        $"Output type `{typeof(Output).FullName}` should not be null"
+                    );
                 }
             }
-
             return output;
         }
         catch (PersistentJob.Repository.ObjectNotFoundException)
