@@ -3,6 +3,7 @@ using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.VisualBasic;
 
 namespace PersistentJobs;
 
@@ -58,9 +59,10 @@ public class JobService : IHostedService
             try
             {
                 // Try to start and queue
-                var inputObject = await workitem.Queue(context, invokable.InputType);
+                var inputObject = workitem.Queue(invokable.InputType);
+                await context.SaveChangesAsync();
 
-                // The workitem is sent to different thread, so I detach here
+                // The workitem is sent to different thread, so detach here
                 context.Entry(workitem).State = EntityState.Detached;
 
                 queue.Queue(
@@ -81,11 +83,13 @@ public class JobService : IHostedService
                                 services,
                                 cancellationToken
                             );
-                            await workitem.Complete(context, outputObject);
+                            workitem.Complete(outputObject);
+                            await context.SaveChangesAsync(CancellationToken.None);
                         }
                         catch (Exception ex)
                         {
-                            await workitem.Exception(context, ex);
+                            await workitem.InsertException(context, ex);
+                            await context.SaveChangesAsync(CancellationToken.None);
                         }
                     }
                 );
@@ -104,6 +108,7 @@ public class JobService : IHostedService
         MethodInfo Method,
         Type[]? ServiceTypes = null,
         Type? InputType = null,
+        Type? ReturnType = null,
         bool HasCancellationToken = false
     )
     {
@@ -135,9 +140,25 @@ public class JobService : IHostedService
             Task outputTask = (Task)Method.Invoke(null, invokeParams.ToArray())!;
             await outputTask.ConfigureAwait(false);
 
-            // TODO: Maybe the calling function could provide accurate type here?
-            return ((dynamic)outputTask).Result as object;
+            if (ReturnType != null)
+            {
+                // TODO: Maybe the calling function could provide accurate type here?
+                return ((dynamic)outputTask).Result as object;
+            }
+            else
+            {
+                return null;
+            }
         }
+    }
+
+    public async static Task<DeferredTask> AddTask(
+        DbContext context,
+        Delegate method,
+        object input = null
+    )
+    {
+        return await PersistentJob.Repository.Insert(context, method, input);
     }
 
     public async static Task<DeferredTask<O>> AddTask<O>(
@@ -175,19 +196,25 @@ public class JobService : IHostedService
                 );
             }
 
-            var types = new List<Type>(method.GetParameters().Select(p => p.ParameterType))
-            {
-                method.ReturnType
-            };
-
             var parameters = method.GetParameters();
             var first = parameters.FirstOrDefault();
             var last = parameters.LastOrDefault();
+            var taskType = method.ReturnType;
+            if (taskType.Name != "Task" && taskType.Name != "Task`1")
+            {
+                throw new Exception("Deferred methods needs to be async");
+            }
 
+            Type? retType = null;
             Type? inputType = null;
             var hasCancellationToken = false;
             var skip = 0;
             var skipLast = 0;
+
+            if (taskType.IsGenericType)
+            {
+                retType = taskType.GetGenericArguments().First();
+            }
 
             if (first?.Name == "input")
             {
@@ -210,6 +237,7 @@ public class JobService : IHostedService
             cache[key] = new Invokable(
                 method,
                 InputType: inputType,
+                ReturnType: retType,
                 ServiceTypes: serviceTypes,
                 HasCancellationToken: hasCancellationToken
             );

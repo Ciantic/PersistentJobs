@@ -39,6 +39,9 @@ public partial class Worker
         await Task.Delay(5000, cancellationToken);
         return true;
     }
+
+    [CreateDeferred]
+    public async static Task UnitJobWithException() { }
 }
 
 public class TestDbContext : DbContext
@@ -112,6 +115,7 @@ public class PersistentJobTests
         {
             var output = await deferred.GetOutput(httpDbContext);
             Assert.Equal(42 + 5, output);
+            Assert.Equal(DeferredTask.Status.Completed, await deferred.GetStatus(httpDbContext));
         }
     }
 
@@ -144,7 +148,18 @@ public class PersistentJobTests
                 await Task.Run(
                     async () =>
                     {
-                        await Task.Delay(200);
+                        await Task.Delay(500);
+
+                        // Ensure it is running
+                        using (var httpDbContext = CreateContext())
+                        {
+                            Assert.Equal(
+                                DeferredTask.Status.Running,
+                                await deferred.GetStatus(httpDbContext)
+                            );
+                        }
+
+                        // Then stop it
                         await service.StopAsync();
                     }
                 );
@@ -156,9 +171,47 @@ public class PersistentJobTests
         // Then user wants to look at the value
         using (var httpDbContext = CreateContext())
         {
-            // await deferred.GetOutput(httpDbContext);
-            // Assert.Equal("cancelled", output);
-            // TODO: Get exceptions!
+            var exceptions = await deferred.GetExceptions(httpDbContext);
+            var first = exceptions.First();
+            Assert.Equal("System.Threading.Tasks.TaskCanceledException", first.Name);
+            Assert.Equal(DeferredTask.Status.Waiting, await deferred.GetStatus(httpDbContext));
+        }
+    }
+
+    [Fact]
+    async public void TestUnitException()
+    {
+        Init();
+
+        // Http runs in own thread and scope, creates a deferred task
+        DeferredTask deferred;
+
+        using (var httpDbContext = CreateContext())
+        {
+            deferred = await Worker.UnitJobWithExceptionDeferred(httpDbContext);
+            await httpDbContext.SaveChangesAsync();
+        }
+
+        // Sometime later, the service runs the deferred tasks autonomusly (to
+        // speed things up we call it manually)
+        var startTask = Task.Run(
+            async () =>
+            {
+                // Background service runs in own thread and scope
+                var services = new ServiceCollection();
+                services.AddScoped((pr) => CreateContext());
+                var provider = services.BuildServiceProvider();
+                var service = new JobService(opts: new(), provider);
+                await service.RunAsync();
+            }
+        );
+
+        await startTask;
+
+        // Then user wants to look at the value
+        using (var httpDbContext = CreateContext())
+        {
+            Assert.Equal(DeferredTask.Status.Completed, await deferred.GetStatus(httpDbContext));
         }
     }
 }

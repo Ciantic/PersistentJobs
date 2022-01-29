@@ -1,4 +1,5 @@
 ﻿using System.Data;
+using System.Dynamic;
 using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text.Json;
@@ -8,7 +9,7 @@ namespace PersistentJobs;
 
 internal class PersistentJob
 {
-    private Guid Id { get; set; } = Guid.NewGuid();
+    internal Guid Id { get; set; } = Guid.NewGuid();
     internal string MethodName { get; set; } = "";
     private string InputJson { get; set; } = "";
     private string? OutputJson { get; set; } = null;
@@ -16,10 +17,9 @@ internal class PersistentJob
     private DateTime? Queued { get; set; } = null;
     private DateTime? Completed { get; set; } = null;
     private TimeSpan TimeLimit { get; set; } = TimeSpan.FromMinutes(30);
-    private uint Retry { get; set; } = 0;
-    private uint MaxRetries { get; set; } = 0;
+    private uint Attempts { get; set; } = 0;
+    private uint MaxAttempts { get; set; } = 1;
     private Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
-    internal ICollection<PersistentJobException> Exceptions { get; set; } = null!;
 
     private PersistentJob() { }
 
@@ -34,11 +34,25 @@ internal class PersistentJob
         model.Property(p => p.Queued);
         model.Property(p => p.Completed);
         model.Property(p => p.TimeLimit);
+        model.Property(p => p.Attempts);
+        model.Property(p => p.MaxAttempts);
         model.Property(p => p.ConcurrencyStamp).IsConcurrencyToken();
     }
 
     internal static class Repository
     {
+        async static internal Task<PersistentJob> Get(DbContext context, Guid id)
+        {
+            var job = (
+                await context.Set<PersistentJob>().Where(p => p.Id == id).FirstOrDefaultAsync()
+            );
+            if (job == null)
+            {
+                throw new ObjectNotFoundException();
+            }
+            return job;
+        }
+
         async static internal Task<Output?> GetCompletedOutput<Output>(DbContext context, Guid id)
         {
             var json = (
@@ -64,6 +78,17 @@ internal class PersistentJob
             return await context.Set<PersistentJob>().Where(p => p.Queued == null).ToListAsync();
         }
 
+        internal async static Task<DeferredTask> Insert(
+            DbContext context,
+            Delegate method,
+            object input
+        )
+        {
+            var job = CreateFromMethod(method, input);
+            await context.Set<PersistentJob>().AddAsync(job);
+            return new DeferredTask(job.Id);
+        }
+
         internal async static Task<DeferredTask<O>> Insert<O>(
             DbContext context,
             Delegate method,
@@ -82,39 +107,72 @@ internal class PersistentJob
         }
     }
 
-    async internal Task<object?> Queue(DbContext context, Type inputType)
+    async internal Task<PersistentJobException[]> GetExceptions(DbContext context)
     {
-        object? inputObject;
-        try
+        return await PersistentJobException.GetAllForJob(context, this);
+    }
+
+    internal object? Queue(Type? inputType)
+    {
+        object? inputObject = null;
+        if (Attempts >= MaxAttempts)
         {
-            inputObject = JsonSerializer.Deserialize(InputJson, inputType);
-        }
-        catch (JsonException)
-        {
-            throw new ArgumentException(
-                "Unable to serialize to given input type",
-                nameof(inputType)
+            throw new InvalidOperationException(
+                "Maximum retries exceeded, queueing is not allowed"
             );
         }
 
+        if (inputType != null)
+        {
+            try
+            {
+                inputObject = JsonSerializer.Deserialize(InputJson, inputType);
+            }
+            catch (JsonException)
+            {
+                throw new ArgumentException(
+                    "Unable to serialize to given input type",
+                    nameof(inputType)
+                );
+            }
+        }
+
+        Attempts += 1;
         Queued = DateTime.UtcNow;
         ConcurrencyStamp = Guid.NewGuid();
-        await context.SaveChangesAsync();
         return inputObject;
     }
 
-    async internal Task<object?> Complete(DbContext context, object outputValue)
+    internal void Complete(object outputValue)
     {
+        if (Queued == null)
+        {
+            throw new InvalidOperationException("Complete does not work for non queued items");
+        }
         OutputJson = JsonSerializer.Serialize(outputValue);
         Completed = DateTime.UtcNow;
         ConcurrencyStamp = Guid.NewGuid();
-        await context.SaveChangesAsync();
-        return outputValue;
     }
 
-    async internal Task Exception(DbContext context, Exception exception)
+    async internal Task InsertException(DbContext context, Exception exception)
     {
-        await PersistentJobException.CreateFromException(context, this, exception);
+        if (Queued == null)
+        {
+            throw new InvalidOperationException("Only queued item can raise exceptions");
+        }
+        Queued = null;
+        ConcurrencyStamp = Guid.NewGuid();
+        await PersistentJobException.Insert(context, this, exception);
+    }
+
+    internal bool IsCompleted()
+    {
+        return Completed != null;
+    }
+
+    internal bool IsQueued()
+    {
+        return Queued != null;
     }
 
     static private PersistentJob CreateFromMethod(Delegate methodDelegate, object input)
