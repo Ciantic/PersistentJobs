@@ -122,6 +122,16 @@ internal class PersistentJob
             );
         }
 
+        if (Queued != null)
+        {
+            throw new InvalidOperationException("Job is already queued");
+        }
+
+        if (Completed != null)
+        {
+            throw new InvalidOperationException("Job is already completed");
+        }
+
         if (inputType != null)
         {
             try
@@ -143,7 +153,7 @@ internal class PersistentJob
         return inputObject;
     }
 
-    internal void Complete(object outputValue)
+    internal void Complete(object? outputValue)
     {
         if (Queued == null)
         {
@@ -160,6 +170,12 @@ internal class PersistentJob
         {
             throw new InvalidOperationException("Only queued item can raise exceptions");
         }
+
+        if (Completed != null)
+        {
+            throw new InvalidOperationException("Completed items can't raise exceptionn");
+        }
+
         Queued = null;
         ConcurrencyStamp = Guid.NewGuid();
         await PersistentJobException.Insert(context, this, exception);

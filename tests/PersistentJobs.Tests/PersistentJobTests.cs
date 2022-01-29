@@ -148,7 +148,7 @@ public class PersistentJobTests
                 await Task.Run(
                     async () =>
                     {
-                        await Task.Delay(500);
+                        await Task.Delay(50);
 
                         // Ensure it is running
                         using (var httpDbContext = CreateContext())
@@ -195,7 +195,7 @@ public class PersistentJobTests
 
         // Sometime later, the service runs the deferred tasks autonomusly (to
         // speed things up we call it manually)
-        var startTask = Task.Run(
+        await Task.Run(
             async () =>
             {
                 // Background service runs in own thread and scope
@@ -206,8 +206,6 @@ public class PersistentJobTests
                 await service.RunAsync();
             }
         );
-
-        await startTask;
 
         // Then user wants to look at the value
         using (var httpDbContext = CreateContext())

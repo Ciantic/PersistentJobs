@@ -112,7 +112,7 @@ public class JobService : IHostedService
         bool HasCancellationToken = false
     )
     {
-        async public Task<object> Invoke(
+        async public Task<object?> Invoke(
             object? input,
             IServiceProvider? serviceProvider = null,
             CancellationToken cancellationToken = default
