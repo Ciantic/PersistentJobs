@@ -31,7 +31,7 @@ public class JobService : IHostedService
         return Task.CompletedTask;
     }
 
-    public async Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         // TODO: For this to work right, one should not add anything to queue
         // after this
@@ -64,7 +64,7 @@ public class JobService : IHostedService
                 context.Entry(workitem).State = EntityState.Detached;
 
                 queue.Queue(
-                    async () =>
+                    async (CancellationToken cancellationToken) =>
                     {
                         // This is run in it's own thread, and needs a new scope
                         using var scope = services.CreateScope();
@@ -73,9 +73,20 @@ public class JobService : IHostedService
                         // Attaches the persistent job to this context instead
                         context.Attach(workitem);
 
-                        // Invoke and complete
-                        var outputObject = await invokable.Invoke(inputObject, services);
-                        await workitem.Complete(context, outputObject);
+                        try
+                        {
+                            // Invoke and complete
+                            var outputObject = await invokable.Invoke(
+                                inputObject,
+                                services,
+                                cancellationToken
+                            );
+                            await workitem.Complete(context, outputObject);
+                        }
+                        catch (Exception ex)
+                        {
+                            await workitem.Exception(context, ex);
+                        }
                     }
                 );
             }
@@ -89,17 +100,36 @@ public class JobService : IHostedService
         await queue.Process();
     }
 
-    internal record Invokable(MethodInfo Method, Type InputType, Type[] ServiceTypes)
+    internal record Invokable(
+        MethodInfo Method,
+        Type[]? ServiceTypes = null,
+        Type? InputType = null,
+        bool HasCancellationToken = false
+    )
     {
-        async public Task<object> Invoke(object? input, IServiceProvider? serviceProvider = null)
+        async public Task<object> Invoke(
+            object? input,
+            IServiceProvider? serviceProvider = null,
+            CancellationToken cancellationToken = default
+        )
         {
-            var invokeParams = new List<object?>() { input };
+            var invokeParams = new List<object?>() { };
+
+            if (InputType != null)
+            {
+                invokeParams.Add(input);
+            }
 
             // Get service parameters
-            if (serviceProvider != null)
+            if (serviceProvider != null && ServiceTypes != null)
             {
                 var services = ServiceTypes.Select(p => serviceProvider.GetRequiredService(p));
                 invokeParams.AddRange(services);
+            }
+
+            if (HasCancellationToken)
+            {
+                invokeParams.Add(cancellationToken);
             }
 
             Task outputTask = (Task)Method.Invoke(null, invokeParams.ToArray())!;
@@ -151,11 +181,37 @@ public class JobService : IHostedService
             };
 
             var parameters = method.GetParameters();
-            var inputPar = parameters.First();
+            var first = parameters.FirstOrDefault();
+            var last = parameters.LastOrDefault();
+
+            Type? inputType = null;
+            var hasCancellationToken = false;
+            var skip = 0;
+            var skipLast = 0;
+
+            if (first?.Name == "input")
+            {
+                inputType = parameters.First().ParameterType;
+                skip = 1;
+            }
+
+            if (last?.ParameterType.FullName == "System.Threading.CancellationToken")
+            {
+                hasCancellationToken = true;
+                skipLast = 1;
+            }
+
+            var serviceTypes = parameters
+                .Skip(skip)
+                .SkipLast(skipLast)
+                .Select(t => t.ParameterType)
+                .ToArray();
+
             cache[key] = new Invokable(
                 method,
-                InputType: inputPar.ParameterType,
-                ServiceTypes: parameters.Skip(1).Select(t => t.ParameterType).ToArray()
+                InputType: inputType,
+                ServiceTypes: serviceTypes,
+                HasCancellationToken: hasCancellationToken
             );
         }
         return cache;

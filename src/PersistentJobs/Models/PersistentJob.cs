@@ -19,6 +19,7 @@ internal class PersistentJob
     private uint Retry { get; set; } = 0;
     private uint MaxRetries { get; set; } = 0;
     private Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
+    internal ICollection<PersistentJobException> Exceptions { get; set; } = null!;
 
     private PersistentJob() { }
 
@@ -109,6 +110,11 @@ internal class PersistentJob
         ConcurrencyStamp = Guid.NewGuid();
         await context.SaveChangesAsync();
         return outputValue;
+    }
+
+    async internal Task Exception(DbContext context, Exception exception)
+    {
+        await PersistentJobException.CreateFromException(context, this, exception);
     }
 
     static private PersistentJob CreateFromMethod(Delegate methodDelegate, object input)

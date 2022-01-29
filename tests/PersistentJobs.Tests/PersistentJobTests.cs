@@ -28,6 +28,17 @@ public partial class Worker
     {
         return Task.FromResult(input + 5);
     }
+
+    [CreateDeferred]
+    public async static Task<bool> AnotherJobCancellable(
+        int input,
+        DbContext dbContext,
+        CancellationToken cancellationToken = default
+    )
+    {
+        await Task.Delay(5000, cancellationToken);
+        return true;
+    }
 }
 
 public class TestDbContext : DbContext
@@ -70,7 +81,7 @@ public class PersistentJobTests
     }
 
     [Fact]
-    async public void TestService()
+    async public void TestExampleJob()
     {
         Init();
 
@@ -89,12 +100,7 @@ public class PersistentJobTests
             {
                 // Background service runs in own thread and scope
                 var services = new ServiceCollection();
-                services.AddScoped(
-                    (pr) =>
-                    {
-                        return CreateContext();
-                    }
-                );
+                services.AddScoped((pr) => CreateContext());
                 var provider = services.BuildServiceProvider();
                 var service = new JobService(opts: new(), provider);
                 await service.RunAsync();
@@ -109,5 +115,50 @@ public class PersistentJobTests
         }
     }
 
+    [Fact]
+    async public void TestCancellableJob()
+    {
+        Init();
 
+        // Http runs in own thread and scope, creates a deferred task
+        DeferredTask<bool> deferred;
+
+        using (var httpDbContext = CreateContext())
+        {
+            deferred = await Worker.AnotherJobCancellableDeferred(42, httpDbContext);
+            await httpDbContext.SaveChangesAsync();
+        }
+
+        // Sometime later, the service runs the deferred tasks autonomusly (to
+        // speed things up we call it manually)
+        var startTask = Task.Run(
+            async () =>
+            {
+                // Background service runs in own thread and scope
+                var services = new ServiceCollection();
+                services.AddScoped((pr) => CreateContext());
+                var provider = services.BuildServiceProvider();
+                var service = new JobService(opts: new(), provider);
+                var _ = service.RunAsync();
+
+                await Task.Run(
+                    async () =>
+                    {
+                        await Task.Delay(200);
+                        await service.StopAsync();
+                    }
+                );
+            }
+        );
+
+        await startTask;
+
+        // Then user wants to look at the value
+        using (var httpDbContext = CreateContext())
+        {
+            // await deferred.GetOutput(httpDbContext);
+            // Assert.Equal("cancelled", output);
+            // TODO: Get exceptions!
+        }
+    }
 }

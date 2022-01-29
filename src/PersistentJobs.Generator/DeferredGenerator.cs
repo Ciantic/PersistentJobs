@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
@@ -28,7 +29,21 @@ namespace PersistentJobs.Generator
                 return;
             }
 
-            var m = receiver.MethodsWithCreateDeferredAttribute.FirstOrDefault();
+            receiver.MethodsWithCreateDeferredAttribute.ForEach(
+                m =>
+                {
+                    Generate(context, m, receiver);
+                }
+            );
+        }
+
+        private static void Generate(
+            GeneratorExecutionContext context,
+            IMethodSymbol m,
+            SyntaxReceiver receiver
+        )
+        {
+            // var m = receiver.MethodsWithCreateDeferredAttribute.FirstOrDefault();
             var inputTypeName = m.Parameters[0].Type.ToDisplayString();
             var namespaceName = m.ContainingNamespace.ToDisplayString();
             var className = m.ContainingType.Name;
@@ -83,7 +98,7 @@ namespace PersistentJobs.Generator
                 .Replace("                    ", "");
             ;
             SourceText sourceText = SourceText.From(source, Encoding.UTF8);
-            context.AddSource("Foo.g.cs", sourceText);
+            context.AddSource($"Deferred.{methodName}.g.cs", sourceText);
         }
     }
 }

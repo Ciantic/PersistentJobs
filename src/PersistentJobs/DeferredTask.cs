@@ -6,6 +6,13 @@ public class DeferredTask<Output>
 {
     public Guid Id { get; }
 
+    public enum Status
+    {
+        Queued,
+        Running,
+        Completed
+    }
+
     public DeferredTask(Guid taskId)
     {
         Id = taskId;
@@ -13,6 +20,7 @@ public class DeferredTask<Output>
 
     async public Task<Output> GetOutput(DbContext context)
     {
+        // TODO: Exceptions: NotCompleted
         try
         {
             var output = await PersistentJob.Repository.GetCompletedOutput<Output>(context, Id);
@@ -38,8 +46,17 @@ public class DeferredTask<Output>
         {
             throw new ObjectNotFoundException();
         }
+    }
 
+    async public Task<bool> Cancel(DbContext context)
+    {
+        // TODO: Exceptions: CompletedAlready
+        throw new NotImplementedException();
+    }
 
+    async public Task<Status> GetStatus(DbContext context)
+    {
+        throw new NotImplementedException();
     }
 
     [Serializable]
