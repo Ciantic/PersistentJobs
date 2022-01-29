@@ -41,7 +41,7 @@ public partial class Worker
     }
 
     [CreateDeferred]
-    public async static Task UnitJobWithException() { }
+    public async static Task UnitJob() { }
 }
 
 public class TestDbContext : DbContext
@@ -135,7 +135,7 @@ public class PersistentJobTests
 
         // Sometime later, the service runs the deferred tasks autonomusly (to
         // speed things up we call it manually)
-        var startTask = Task.Run(
+        await Task.Run(
             async () =>
             {
                 // Background service runs in own thread and scope
@@ -160,13 +160,14 @@ public class PersistentJobTests
                         }
 
                         // Then stop it
+                        //
+                        // (this should cancel the CancellationToken given to
+                        // the `AnotherJobCancellable`)
                         await service.StopAsync();
                     }
                 );
             }
         );
-
-        await startTask;
 
         // Then user wants to look at the value
         using (var httpDbContext = CreateContext())
@@ -179,7 +180,7 @@ public class PersistentJobTests
     }
 
     [Fact]
-    async public void TestUnitException()
+    async public void TestUnit()
     {
         Init();
 
@@ -188,7 +189,7 @@ public class PersistentJobTests
 
         using (var httpDbContext = CreateContext())
         {
-            deferred = await Worker.UnitJobWithExceptionDeferred(httpDbContext);
+            deferred = await Worker.UnitJobDeferred(httpDbContext);
             await httpDbContext.SaveChangesAsync();
         }
 
