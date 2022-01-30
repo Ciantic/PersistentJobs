@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.AccessControl;
 
 namespace PersistentJobs;
 
@@ -33,13 +34,26 @@ internal class TaskQueue
         _processingQueue.Enqueue((new CancellationTokenSource(), (c) => futureTask.Invoke()));
     }
 
-    public CancellationTokenSource Queue(Func<CancellationToken, Task> futureTask)
+    public CancellationTokenSource Queue(
+        Func<CancellationToken, Task> futureTask,
+        TimeSpan? timeLimit = null
+    )
     {
         if (_processingQueue.Count >= _maxQueueLength)
         {
             throw new QueueLimitReachedException();
         }
-        var cancelSource = new CancellationTokenSource();
+        CancellationTokenSource cancelSource;
+        var timeLimitMillis = timeLimit?.TotalMilliseconds ?? 0;
+        if (timeLimitMillis != 0)
+        {
+            cancelSource = new CancellationTokenSource((int)timeLimitMillis);
+        }
+        else
+        {
+            cancelSource = new CancellationTokenSource();
+        }
+
         _processingQueue.Enqueue((cancelSource, futureTask));
         return cancelSource;
     }

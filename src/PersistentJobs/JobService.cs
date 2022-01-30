@@ -89,7 +89,8 @@ public class JobService : IHostedService
                             await workitem.InsertException(context, ex);
                             await context.SaveChangesAsync(CancellationToken.None);
                         }
-                    }
+                    },
+                    workitem.GetTimeLimit()
                 );
             }
             catch (DBConcurrencyException)
@@ -104,6 +105,7 @@ public class JobService : IHostedService
 
     internal record Invokable(
         MethodInfo Method,
+        TimeSpan? TimeLimit = null,
         Type[]? ServiceTypes = null,
         Type? InputType = null,
         Type? ReturnType = null,
@@ -176,9 +178,10 @@ public class JobService : IHostedService
             .GetAssemblies()
             .SelectMany(t => t.GetTypes())
             .SelectMany(t => t.GetMethods())
-            .Where(m => m.GetCustomAttributes(typeof(JobAttribute), false).Length > 0);
+            .Select(t => (t, t.GetCustomAttributes<JobAttribute>().FirstOrDefault()))
+            .Where(ma => ma.Item2 != null);
 
-        foreach (var method in methods)
+        foreach (var (method, attribute) in methods)
         {
             var key = method.Name;
 

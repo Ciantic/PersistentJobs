@@ -45,6 +45,12 @@ public partial class Worker
     {
         return Task.CompletedTask;
     }
+
+    [CreateDeferred(MaxAttempts = 3, WaitBetweenAttemptsSeconds = 2)]
+    public static Task ExceptionJob()
+    {
+        throw new Exception("This is a known failure");
+    }
 }
 
 public class TestDbContext : DbContext
@@ -217,5 +223,39 @@ public class PersistentJobTests
         }
     }
 
+    // [Fact]
+    async public void TestExceptions()
+    {
+        Init();
+
+        // Http runs in own thread and scope, creates a deferred task
+        DeferredTask deferred;
+
+        using (var httpDbContext = CreateContext())
+        {
+            deferred = await Worker.ExceptionJobDeferred(httpDbContext);
+            await httpDbContext.SaveChangesAsync();
+        }
+
+        // Sometime later, the service runs the deferred tasks autonomusly (to
+        // speed things up we call it manually)
+        await Task.Run(
+            async () =>
+            {
+                // Background service runs in own thread and scope
+                var services = new ServiceCollection();
+                services.AddScoped((pr) => CreateContext());
+                var provider = services.BuildServiceProvider();
+                var service = new JobService(opts: new(), provider);
+                await service.RunAsync();
+            }
+        );
+
+        // Then user wants to look at the value
+        using (var httpDbContext = CreateContext())
+        {
+            Assert.Equal(DeferredTask.Status.Completed, await deferred.GetStatus(httpDbContext));
+        }
+    }
     // TODO: Test WaitBetweenAttempts
 }

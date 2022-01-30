@@ -123,6 +123,11 @@ internal class PersistentJob
         return await PersistentJobException.GetAllForJob(context, this);
     }
 
+    internal TimeSpan? GetTimeLimit()
+    {
+        return TimeLimit;
+    }
+
     internal object? Queue(Type? inputType)
     {
         object? inputObject = null;
@@ -216,11 +221,16 @@ internal class PersistentJob
     static private PersistentJob CreateFromMethod(Delegate methodDelegate, object? input)
     {
         var method = methodDelegate.GetMethodInfo();
+        var attribute = method.GetCustomAttribute<JobAttribute>();
         var methodName = method.Name;
+
         return new PersistentJob()
         {
             MethodName = methodName,
-            InputJson = JsonSerializer.Serialize(input)
+            InputJson = JsonSerializer.Serialize(input),
+            WaitBetweenAttempts = TimeSpan.FromSeconds(attribute.WaitBetweenAttemptsSeconds),
+            TimeLimit = TimeSpan.FromSeconds(attribute.TimeLimitSeconds),
+            MaxAttempts = attribute.MaxAttempts
         };
     }
 }

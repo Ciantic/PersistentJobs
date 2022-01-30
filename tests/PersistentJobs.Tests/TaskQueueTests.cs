@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -217,6 +218,36 @@ public class TaskQueueTests
         Expected: 6
         Actual:   5
         */
+    }
+
+    [Fact]
+    public async Task TestTimeLimit()
+    {
+        var t = new TaskQueue();
+        var atom = 0;
+        t.Queue(
+            async (CancellationToken cancellationToken) =>
+            {
+                await Task.Delay(40, cancellationToken);
+                atom = 1;
+            },
+            TimeSpan.FromMilliseconds(20)
+        );
+        await t.Process();
+        Assert.Equal(0, atom);
+    }
+
+    [Fact]
+    public async Task TestException()
+    {
+        var t = new TaskQueue();
+        t.Queue(
+            (CancellationToken token) =>
+            {
+                throw new Exception("What you did there?");
+            }
+        );
+        await t.Process();
     }
 
     [Fact]
