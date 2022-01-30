@@ -27,7 +27,7 @@ public class JobService : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        timer = new Timer(Tick, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+        timer = new Timer(Tick, null, 0, Timeout.Infinite);
         return Task.CompletedTask;
     }
 
@@ -41,6 +41,7 @@ public class JobService : IHostedService
     private async void Tick(object? state)
     {
         await RunAsync();
+        timer!.Change(60000, Timeout.Infinite);
     }
 
     public async Task RunAsync()
@@ -53,9 +54,15 @@ public class JobService : IHostedService
         // Start and queue each work item
         foreach (var workitem in availableJobs)
         {
-            var invokable = methods[workitem.MethodName];
-            object? inputObject;
+            var invokable = methods.GetValueOrDefault(workitem.MethodName);
+            if (invokable is null)
+            {
+                // TODO: Corresponding method is not found from this assembly,
+                // this is not an error, but needs to be logged as warning.
+                continue;
+            }
 
+            object? inputObject;
             try
             {
                 // Try to start and queue

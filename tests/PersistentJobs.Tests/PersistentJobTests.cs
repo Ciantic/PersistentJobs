@@ -75,29 +75,17 @@ public class PersistentJobTests
 {
     static internal void Init()
     {
-        var builder = new DbContextOptionsBuilder<TestDbContext>().UseSqlite(
-            "DataSource=test.sqlite"
-        );
-
-        builder.EnableSensitiveDataLogging(true);
-
-        var options = builder.Options;
-
-        // Create the schema in the database
-        var context = new TestDbContext(options);
-
+        var context = CreateContext();
         context.Database.EnsureDeleted();
         context.Database.EnsureCreated();
     }
 
     static public DbContext CreateContext()
     {
-        var options =
-            new DbContextOptionsBuilder<TestDbContext>().UseSqlite(
-                "DataSource=test.sqlite"
-            ).Options;
-
-        // Create the schema in the database
+        var builder = new DbContextOptionsBuilder<TestDbContext>()
+            .UseSqlite("DataSource=persistentjob.sqlite")
+            .EnableSensitiveDataLogging(true);
+        var options = builder.Options;
         var context = new TestDbContext(options);
         return context;
     }

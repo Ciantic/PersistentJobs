@@ -232,7 +232,7 @@ public class TaskQueueTests
                     atom = 1;
                 }
             )
-            .WithTimeLimit(TimeSpan.FromMilliseconds(20));
+            .WithTimeLimit(TimeSpan.FromMilliseconds(10));
         await t.Process();
         Assert.Equal(0, atom);
     }
