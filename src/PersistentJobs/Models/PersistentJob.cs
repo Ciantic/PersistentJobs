@@ -84,7 +84,8 @@ internal class PersistentJob
                 .Where(
                     p =>
                         p.Queued == null
-                        && (p.AttemptAfter >= DateTime.UtcNow || p.AttemptAfter == null)
+                        && (p.Attempts < p.MaxAttempts)
+                        && (p.AttemptAfter <= DateTime.UtcNow || p.AttemptAfter == null)
                 )
                 .ToListAsync();
         }
@@ -136,6 +137,11 @@ internal class PersistentJob
             throw new InvalidOperationException(
                 "Maximum retries exceeded, queueing is not allowed"
             );
+        }
+
+        if (AttemptAfter is not null && DateTime.UtcNow < AttemptAfter)
+        {
+            throw new InvalidOperationException("Job must be queued later");
         }
 
         if (Queued != null)
@@ -216,6 +222,11 @@ internal class PersistentJob
     internal bool IsQueued()
     {
         return Queued != null;
+    }
+
+    internal bool MaxAttemptsReached()
+    {
+        return Attempts >= MaxAttempts;
     }
 
     static private PersistentJob CreateFromMethod(Delegate methodDelegate, object? input)

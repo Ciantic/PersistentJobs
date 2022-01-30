@@ -54,57 +54,64 @@ public class JobService : IHostedService
         foreach (var workitem in availableJobs)
         {
             var invokable = methods[workitem.MethodName];
+            object? inputObject;
+
             try
             {
                 // Try to start and queue
-                var inputObject = workitem.Queue(invokable.InputType);
+                inputObject = workitem.Queue(invokable.InputType);
                 await context.SaveChangesAsync();
-
-                // The workitem is sent to different thread, so detach here
-                context.Entry(workitem).State = EntityState.Detached;
-
-                queue
-                    .Queue(
-                        async (CancellationToken cancellationToken) =>
-                        {
-                            // This is run in it's own thread, and needs a new scope
-                            using var scope = services.CreateScope();
-                            using var context =
-                                scope.ServiceProvider.GetRequiredService<DbContext>();
-
-                            // Attaches the persistent job to this context instead
-                            context.Attach(workitem);
-
-                            try
-                            {
-                                // Invoke and complete
-                                var outputObject = await invokable.Invoke(
-                                    inputObject,
-                                    services,
-                                    cancellationToken
-                                );
-                                workitem.Complete(outputObject);
-                                await context.SaveChangesAsync(CancellationToken.None);
-                            }
-                            catch (Exception ex)
-                            {
-                                await workitem.InsertException(context, ex);
-                                await context.SaveChangesAsync(CancellationToken.None);
-                            }
-                        }
-                    )
-                    .WithTimeLimit(workitem.GetTimeLimit())
-                    .WithExceptionHandler(
-                        ex =>
-                        {
-                            Console.WriteLine(ex);
-                        }
-                    );
             }
             catch (DBConcurrencyException)
             {
                 // Some other process managed to snatch the task
+                continue;
             }
+
+            // The workitem is sent to different thread, so detach here
+            context.Entry(workitem).State = EntityState.Detached;
+
+            queue
+                .Queue(
+                    async (CancellationToken cancellationToken) =>
+                    {
+                        // This is run in it's own thread, and needs a new scope
+                        using var scope = services.CreateScope();
+                        using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
+
+                        // Attaches the persistent job to this context instead
+                        context.Attach(workitem);
+
+                        try
+                        {
+                            // Invoke and complete
+                            var outputObject = await invokable.Invoke(
+                                inputObject,
+                                services,
+                                cancellationToken
+                            );
+                            workitem.Complete(outputObject);
+                            await context.SaveChangesAsync(CancellationToken.None);
+                        }
+                        catch (TargetInvocationException te)
+                        {
+                            await workitem.InsertException(context, te.InnerException);
+                            await context.SaveChangesAsync(CancellationToken.None);
+                        }
+                        catch (Exception ex)
+                        {
+                            await workitem.InsertException(context, ex);
+                            await context.SaveChangesAsync(CancellationToken.None);
+                        }
+                    }
+                )
+                .WithTimeLimit(workitem.GetTimeLimit())
+                .WithExceptionHandler(
+                    ex =>
+                    {
+                        Console.WriteLine(ex);
+                    }
+                );
         }
 
         // Awaits until the queue is completed

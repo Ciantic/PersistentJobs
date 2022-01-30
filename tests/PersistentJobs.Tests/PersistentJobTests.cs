@@ -46,10 +46,16 @@ public partial class Worker
         return Task.CompletedTask;
     }
 
-    [CreateDeferred(MaxAttempts = 3, WaitBetweenAttemptsSeconds = 2)]
+    [CreateDeferred(MaxAttempts = 3)]
     public static Task ExceptionJob()
     {
-        throw new Exception("This is a known failure");
+        throw new MyException("This is a known failure");
+    }
+
+    [System.Serializable]
+    public class MyException : System.Exception
+    {
+        public MyException(string message) : base(message) { }
     }
 }
 
@@ -69,13 +75,17 @@ public class PersistentJobTests
 {
     static internal void Init()
     {
-        var options =
-            new DbContextOptionsBuilder<TestDbContext>().UseSqlite(
-                "DataSource=test.sqlite"
-            ).Options;
+        var builder = new DbContextOptionsBuilder<TestDbContext>().UseSqlite(
+            "DataSource=test.sqlite"
+        );
+
+        builder.EnableSensitiveDataLogging(true);
+
+        var options = builder.Options;
 
         // Create the schema in the database
         var context = new TestDbContext(options);
+
         context.Database.EnsureDeleted();
         context.Database.EnsureCreated();
     }
@@ -184,7 +194,7 @@ public class PersistentJobTests
             var exceptions = await deferred.GetExceptions(httpDbContext);
             var first = exceptions.First();
             Assert.Equal("System.Threading.Tasks.TaskCanceledException", first.Name);
-            Assert.Equal(DeferredTask.Status.Waiting, await deferred.GetStatus(httpDbContext));
+            Assert.Equal(DeferredTask.Status.Failed, await deferred.GetStatus(httpDbContext));
         }
     }
 
@@ -223,7 +233,7 @@ public class PersistentJobTests
         }
     }
 
-    // [Fact]
+    [Fact]
     async public void TestExceptions()
     {
         Init();
@@ -248,13 +258,38 @@ public class PersistentJobTests
                 var provider = services.BuildServiceProvider();
                 var service = new JobService(opts: new(), provider);
                 await service.RunAsync();
+                using (var httpDbContext = CreateContext())
+                {
+                    Assert.Equal(
+                        DeferredTask.Status.Waiting,
+                        await deferred.GetStatus(httpDbContext)
+                    );
+                }
+                await service.RunAsync();
+                using (var httpDbContext = CreateContext())
+                {
+                    Assert.Equal(
+                        DeferredTask.Status.Waiting,
+                        await deferred.GetStatus(httpDbContext)
+                    );
+                }
+                await service.RunAsync();
             }
         );
 
-        // Then user wants to look at the value
+        // Then checkout the exception, and ensure it has failed
         using (var httpDbContext = CreateContext())
         {
-            Assert.Equal(DeferredTask.Status.Completed, await deferred.GetStatus(httpDbContext));
+            // Failed
+            Assert.Equal(DeferredTask.Status.Failed, await deferred.GetStatus(httpDbContext));
+
+            // With three exceptions
+            var exceptions = await deferred.GetExceptions(httpDbContext);
+            Assert.Equal(3, exceptions.Length);
+
+            // Where exception is MyException
+            var first = exceptions.First();
+            Assert.Equal("PersistentJobs.Tests.Worker+MyException", first.Name);
         }
     }
     // TODO: Test WaitBetweenAttempts

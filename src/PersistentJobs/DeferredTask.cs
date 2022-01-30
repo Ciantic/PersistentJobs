@@ -12,6 +12,7 @@ public class DeferredTask
         Queued,
         Running,
         Completed,
+        Failed,
         Waiting
     }
 
@@ -58,6 +59,10 @@ public class DeferredTask
         if (job.IsQueued())
         {
             return Status.Queued;
+        }
+        if (job.MaxAttemptsReached())
+        {
+            return Status.Failed;
         }
         return Status.Waiting;
     }
