@@ -221,7 +221,11 @@ internal class PersistentJob
     static private PersistentJob CreateFromMethod(Delegate methodDelegate, object? input)
     {
         var method = methodDelegate.GetMethodInfo();
-        var attribute = method.GetCustomAttribute<JobAttribute>();
+        var attribute =
+            method.GetCustomAttribute<JobAttribute>()
+            ?? throw new InvalidOperationException(
+                $"JobAttribute must be set for method '{method.Name}'"
+            );
         var methodName = method.Name;
 
         return new PersistentJob()
