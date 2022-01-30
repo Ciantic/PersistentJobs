@@ -15,7 +15,7 @@ using Xunit.Sdk;
 
 public class TaskQueueTests
 {
-    [Fact] 
+    [Fact]
     public async Task TestCancellation()
     {
         var n = 0;
@@ -208,6 +208,15 @@ public class TaskQueueTests
         Assert.Equal(0, t.GetRunningCount());
         Assert.Equal(0, t.GetQueueCount());
         Assert.Equal(6, n);
+
+        /*
+        This happened once, when under higher load, maybe it's okay?:
+        
+        Failed TaskQueueTests.TestMaxParallelization [127 ms]
+        Error Message: Assert.Equal() Failure
+        Expected: 6
+        Actual:   5
+        */
     }
 
     [Fact]

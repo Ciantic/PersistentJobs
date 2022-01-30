@@ -17,6 +17,8 @@ internal class PersistentJob
     private DateTime? Queued { get; set; } = null;
     private DateTime? Completed { get; set; } = null;
     private TimeSpan TimeLimit { get; set; } = TimeSpan.FromMinutes(30);
+    private TimeSpan? WaitBetweenAttempts { get; set; } = null;
+    private DateTime? AttemptAfter { get; set; }
     private uint Attempts { get; set; } = 0;
     private uint MaxAttempts { get; set; } = 1;
     private Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
@@ -34,7 +36,9 @@ internal class PersistentJob
         model.Property(p => p.Queued);
         model.Property(p => p.Completed);
         model.Property(p => p.TimeLimit);
+        model.Property(p => p.AttemptAfter);
         model.Property(p => p.Attempts);
+        model.Property(p => p.WaitBetweenAttempts);
         model.Property(p => p.MaxAttempts);
         model.Property(p => p.ConcurrencyStamp).IsConcurrencyToken();
     }
@@ -75,7 +79,14 @@ internal class PersistentJob
         async static internal Task<List<PersistentJob>> GetAvailable(DbContext context)
         {
             // Get all unstarted work items
-            return await context.Set<PersistentJob>().Where(p => p.Queued == null).ToListAsync();
+            return await context
+                .Set<PersistentJob>()
+                .Where(
+                    p =>
+                        p.Queued == null
+                        && (p.AttemptAfter >= DateTime.UtcNow || p.AttemptAfter == null)
+                )
+                .ToListAsync();
         }
 
         internal async static Task<DeferredTask> Insert(
@@ -184,6 +195,11 @@ internal class PersistentJob
 
         Queued = null;
         ConcurrencyStamp = Guid.NewGuid();
+        if (WaitBetweenAttempts != null)
+        {
+            AttemptAfter = DateTime.UtcNow + WaitBetweenAttempts;
+        }
+
         await PersistentJobException.Insert(context, this, exception);
     }
 
