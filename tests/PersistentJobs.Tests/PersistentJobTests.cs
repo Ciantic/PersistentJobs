@@ -41,7 +41,10 @@ public partial class Worker
     }
 
     [CreateDeferred]
-    public async static Task UnitJob() { }
+    public static Task UnitJob()
+    {
+        return Task.CompletedTask;
+    }
 }
 
 public class TestDbContext : DbContext
@@ -58,7 +61,7 @@ public class TestDbContext : DbContext
 
 public class PersistentJobTests
 {
-    static public void Init()
+    static internal void Init()
     {
         var options =
             new DbContextOptionsBuilder<TestDbContext>().UseSqlite(

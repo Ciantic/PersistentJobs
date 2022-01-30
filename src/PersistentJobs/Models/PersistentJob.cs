@@ -81,7 +81,7 @@ internal class PersistentJob
         internal async static Task<DeferredTask> Insert(
             DbContext context,
             Delegate method,
-            object input
+            object? input
         )
         {
             var job = CreateFromMethod(method, input);
@@ -197,7 +197,7 @@ internal class PersistentJob
         return Queued != null;
     }
 
-    static private PersistentJob CreateFromMethod(Delegate methodDelegate, object input)
+    static private PersistentJob CreateFromMethod(Delegate methodDelegate, object? input)
     {
         var method = methodDelegate.GetMethodInfo();
         var methodName = method.Name;

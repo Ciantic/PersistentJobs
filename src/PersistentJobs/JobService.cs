@@ -20,7 +20,6 @@ public class JobService : IHostedService
 
     public JobService(JobServiceOpts opts, IServiceProvider services)
     {
-        // TODO: Configurable parallelization count
         queue = new(opts.MaxParallelizationCount);
         this.services = services;
         methods = BuildMethodsCache();
@@ -34,8 +33,7 @@ public class JobService : IHostedService
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        // TODO: For this to work right, one should not add anything to queue
-        // after this
+        timer?.Change(Timeout.Infinite, Timeout.Infinite);
         queue.Cancel();
         await queue.Process();
     }
@@ -155,7 +153,7 @@ public class JobService : IHostedService
     public async static Task<DeferredTask> AddTask(
         DbContext context,
         Delegate method,
-        object input = null
+        object? input = null
     )
     {
         return await PersistentJob.Repository.Insert(context, method, input);

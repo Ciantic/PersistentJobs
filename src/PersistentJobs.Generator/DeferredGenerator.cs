@@ -32,28 +32,24 @@ namespace PersistentJobs.Generator
             receiver.MethodsWithCreateDeferredAttribute.ForEach(
                 m =>
                 {
-                    Generate(context, m, receiver);
+                    Generate(context, m);
                 }
             );
         }
 
-        private static void Generate(
-            GeneratorExecutionContext context,
-            IMethodSymbol m,
-            SyntaxReceiver receiver
-        )
+        private static void Generate(GeneratorExecutionContext context, IMethodSymbol methodSymbol)
         {
             // var m = receiver.MethodsWithCreateDeferredAttribute.FirstOrDefault();
             var inputTypeName = "";
-            if (m.Parameters.Length >= 1)
+            if (methodSymbol.Parameters.Length >= 1)
             {
-                inputTypeName = m.Parameters[0].Type.ToDisplayString();
+                inputTypeName = methodSymbol.Parameters[0].Type.ToDisplayString();
             }
 
-            var namespaceName = m.ContainingNamespace.ToDisplayString();
-            var className = m.ContainingType.Name;
-            var methodName = m.Name;
-            var retType = m.ReturnType;
+            var namespaceName = methodSymbol.ContainingNamespace.ToDisplayString();
+            var className = methodSymbol.ContainingType.Name;
+            var methodName = methodSymbol.Name;
+            var retType = methodSymbol.ReturnType;
             var outputTypeName = "";
             if (retType is INamedTypeSymbol)
             {
@@ -76,32 +72,20 @@ namespace PersistentJobs.Generator
                 }
             }
 
-            var output = "";
-            if (outputTypeName != "")
-            {
-                output = $"DeferredTask<{outputTypeName}>";
-            }
-            else
-            {
-                output = "DeferredTask";
-            }
-
-            var inputArgOpt = "";
-            if (inputTypeName != "")
-            {
-                inputArgOpt = $"{inputTypeName} input, ";
-            }
-
-            var inputValue = "null";
-            if (inputTypeName != "")
-            {
-                inputValue = "input";
-            }
-
+            var output = "DeferredTask";
             var addTaskGeneric = "";
             if (outputTypeName != "")
             {
+                output = $"DeferredTask<{outputTypeName}>";
                 addTaskGeneric = $"<{outputTypeName}>";
+            }
+
+            var inputArgOpt = "";
+            var inputParam = "null";
+            if (inputTypeName != "")
+            {
+                inputArgOpt = $"{inputTypeName} input, ";
+                inputParam = "input";
             }
 
             var source = FormattableString
@@ -120,7 +104,7 @@ namespace PersistentJobs.Generator
                                 Microsoft.EntityFrameworkCore.DbContext context
                             ) 
                             {{
-                                return await JobService.AddTask{addTaskGeneric}(context, {methodName}, {inputValue});
+                                return await JobService.AddTask{addTaskGeneric}(context, {methodName}, {inputParam});
                             }}
                         }}
                     }}

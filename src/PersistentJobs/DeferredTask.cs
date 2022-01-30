@@ -38,11 +38,11 @@ public class DeferredTask
         }
     }
 
-    async public Task<bool> Cancel(DbContext context)
-    {
-        // TODO: Exceptions: CompletedAlready
-        throw new NotImplementedException();
-    }
+    // TODO: async public Task<bool> Cancel(DbContext context)
+    // {
+    //     // TODO: Exceptions: CompletedAlready
+    //     throw new NotImplementedException();
+    // }
 
     async public Task<Status> GetStatus(DbContext context)
     {
