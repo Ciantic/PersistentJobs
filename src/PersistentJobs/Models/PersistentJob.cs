@@ -159,6 +159,12 @@ internal class PersistentJob
         {
             throw new InvalidOperationException("Complete does not work for non queued items");
         }
+
+        if (Completed != null)
+        {
+            throw new InvalidOperationException("It's already completed");
+        }
+
         OutputJson = JsonSerializer.Serialize(outputValue);
         Completed = DateTime.UtcNow;
         ConcurrencyStamp = Guid.NewGuid();
@@ -173,7 +179,7 @@ internal class PersistentJob
 
         if (Completed != null)
         {
-            throw new InvalidOperationException("Completed items can't raise exceptionn");
+            throw new InvalidOperationException("Completed items can't raise exceptions");
         }
 
         Queued = null;
