@@ -16,7 +16,7 @@ internal class PersistentJob
     private DateTime Created { get; set; } = DateTime.UtcNow;
     private DateTime? Queued { get; set; } = null;
     private DateTime? Completed { get; set; } = null;
-    private TimeSpan TimeLimit { get; set; } = TimeSpan.FromMinutes(30);
+    private TimeSpan? TimeLimit { get; set; } = null;
     private TimeSpan? WaitBetweenAttempts { get; set; } = null;
     private DateTime? AttemptAfter { get; set; }
     private uint Attempts { get; set; } = 0;
@@ -123,9 +123,9 @@ internal class PersistentJob
         return await PersistentJobException.GetAllForJob(context, this);
     }
 
-    internal TimeSpan? GetTimeLimit()
+    internal TimeSpan GetTimeLimit()
     {
-        return TimeLimit;
+        return TimeLimit ?? TimeSpan.FromSeconds(0);
     }
 
     internal object? Queue(Type? inputType)
@@ -229,7 +229,10 @@ internal class PersistentJob
             MethodName = methodName,
             InputJson = JsonSerializer.Serialize(input),
             WaitBetweenAttempts = TimeSpan.FromSeconds(attribute.WaitBetweenAttemptsSeconds),
-            TimeLimit = TimeSpan.FromSeconds(attribute.TimeLimitSeconds),
+            TimeLimit =
+                attribute.TimeLimitSeconds > 0
+                    ? TimeSpan.FromSeconds(attribute.TimeLimitSeconds)
+                    : null,
             MaxAttempts = attribute.MaxAttempts
         };
     }

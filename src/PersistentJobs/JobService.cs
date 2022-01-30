@@ -63,35 +63,43 @@ public class JobService : IHostedService
                 // The workitem is sent to different thread, so detach here
                 context.Entry(workitem).State = EntityState.Detached;
 
-                queue.Queue(
-                    async (CancellationToken cancellationToken) =>
-                    {
-                        // This is run in it's own thread, and needs a new scope
-                        using var scope = services.CreateScope();
-                        using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
-
-                        // Attaches the persistent job to this context instead
-                        context.Attach(workitem);
-
-                        try
+                queue
+                    .Queue(
+                        async (CancellationToken cancellationToken) =>
                         {
-                            // Invoke and complete
-                            var outputObject = await invokable.Invoke(
-                                inputObject,
-                                services,
-                                cancellationToken
-                            );
-                            workitem.Complete(outputObject);
-                            await context.SaveChangesAsync(CancellationToken.None);
+                            // This is run in it's own thread, and needs a new scope
+                            using var scope = services.CreateScope();
+                            using var context =
+                                scope.ServiceProvider.GetRequiredService<DbContext>();
+
+                            // Attaches the persistent job to this context instead
+                            context.Attach(workitem);
+
+                            try
+                            {
+                                // Invoke and complete
+                                var outputObject = await invokable.Invoke(
+                                    inputObject,
+                                    services,
+                                    cancellationToken
+                                );
+                                workitem.Complete(outputObject);
+                                await context.SaveChangesAsync(CancellationToken.None);
+                            }
+                            catch (Exception ex)
+                            {
+                                await workitem.InsertException(context, ex);
+                                await context.SaveChangesAsync(CancellationToken.None);
+                            }
                         }
-                        catch (Exception ex)
+                    )
+                    .WithTimeLimit(workitem.GetTimeLimit())
+                    .WithExceptionHandler(
+                        ex =>
                         {
-                            await workitem.InsertException(context, ex);
-                            await context.SaveChangesAsync(CancellationToken.None);
+                            Console.WriteLine(ex);
                         }
-                    },
-                    workitem.GetTimeLimit()
-                );
+                    );
             }
             catch (DBConcurrencyException)
             {

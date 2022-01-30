@@ -63,11 +63,11 @@ public class TaskQueueTests
             }
         );
 
-        Assert.False(c1.IsCancellationRequested);
-        Assert.False(c2.IsCancellationRequested);
+        Assert.False(c1.IsCancellationRequested());
+        Assert.False(c2.IsCancellationRequested());
         t.Cancel();
-        Assert.True(c1.IsCancellationRequested);
-        Assert.True(c2.IsCancellationRequested);
+        Assert.True(c1.IsCancellationRequested());
+        Assert.True(c2.IsCancellationRequested());
     }
 
     [Fact]
@@ -96,11 +96,11 @@ public class TaskQueueTests
         // Cancel the task after 40 ms
         await Task.Delay(40);
         Assert.Equal(2, t.GetRunningCount());
-        Assert.False(c1.IsCancellationRequested);
-        Assert.False(c2.IsCancellationRequested);
+        Assert.False(c1.IsCancellationRequested());
+        Assert.False(c2.IsCancellationRequested());
         t.Cancel();
-        Assert.True(c1.IsCancellationRequested);
-        Assert.True(c2.IsCancellationRequested);
+        Assert.True(c1.IsCancellationRequested());
+        Assert.True(c2.IsCancellationRequested());
 
         // Cancellation should take effect shortly
         await Task.Delay(10);
@@ -226,13 +226,13 @@ public class TaskQueueTests
         var t = new TaskQueue();
         var atom = 0;
         t.Queue(
-            async (CancellationToken cancellationToken) =>
-            {
-                await Task.Delay(40, cancellationToken);
-                atom = 1;
-            },
-            TimeSpan.FromMilliseconds(20)
-        );
+                async (CancellationToken cancellationToken) =>
+                {
+                    await Task.Delay(40, cancellationToken);
+                    atom = 1;
+                }
+            )
+            .WithTimeLimit(TimeSpan.FromMilliseconds(20));
         await t.Process();
         Assert.Equal(0, atom);
     }
@@ -240,14 +240,22 @@ public class TaskQueueTests
     [Fact]
     public async Task TestException()
     {
+        var gotit = "";
         var t = new TaskQueue();
         t.Queue(
-            (CancellationToken token) =>
-            {
-                throw new Exception("What you did there?");
-            }
-        );
+                (CancellationToken token) =>
+                {
+                    throw new Exception("What you did there?");
+                }
+            )
+            .WithExceptionHandler(
+                ex =>
+                {
+                    gotit = ex.Message;
+                }
+            );
         await t.Process();
+        Assert.Equal("What you did there?", gotit);
     }
 
     [Fact]
