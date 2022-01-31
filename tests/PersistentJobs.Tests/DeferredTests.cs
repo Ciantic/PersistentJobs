@@ -112,8 +112,8 @@ public class PersistentJobTests
                 var services = new ServiceCollection();
                 services.AddScoped((pr) => CreateContext());
                 var provider = services.BuildServiceProvider();
-                var service = new JobService(opts: new(), provider);
-                await service.RunAsync();
+                var service = new DeferredQueue(opts: new(), provider);
+                await service.ProcessAsync();
             }
         );
 
@@ -149,8 +149,8 @@ public class PersistentJobTests
                 var services = new ServiceCollection();
                 services.AddScoped((pr) => CreateContext());
                 var provider = services.BuildServiceProvider();
-                var service = new JobService(opts: new(), provider);
-                var _ = service.RunAsync();
+                var service = new DeferredQueue(opts: new(), provider);
+                var _ = service.ProcessAsync();
 
                 await Task.Run(
                     async () =>
@@ -170,7 +170,7 @@ public class PersistentJobTests
                         //
                         // (this should cancel the CancellationToken given to
                         // the `AnotherJobCancellable`)
-                        await service.StopAsync();
+                        await service.CancelAsync();
                     }
                 );
             }
@@ -209,8 +209,8 @@ public class PersistentJobTests
                 var services = new ServiceCollection();
                 services.AddScoped((pr) => CreateContext());
                 var provider = services.BuildServiceProvider();
-                var service = new JobService(opts: new(), provider);
-                await service.RunAsync();
+                var service = new DeferredQueue(opts: new(), provider);
+                await service.ProcessAsync();
             }
         );
 
@@ -244,18 +244,18 @@ public class PersistentJobTests
                 var services = new ServiceCollection();
                 services.AddScoped((pr) => CreateContext());
                 var provider = services.BuildServiceProvider();
-                var service = new JobService(opts: new(), provider);
-                await service.RunAsync();
+                var service = new DeferredQueue(opts: new(), provider);
+                await service.ProcessAsync();
                 using (var httpDbContext = CreateContext())
                 {
                     Assert.Equal(Deferred.Status.Waiting, await deferred.GetStatus(httpDbContext));
                 }
-                await service.RunAsync();
+                await service.ProcessAsync();
                 using (var httpDbContext = CreateContext())
                 {
                     Assert.Equal(Deferred.Status.Waiting, await deferred.GetStatus(httpDbContext));
                 }
-                await service.RunAsync();
+                await service.ProcessAsync();
             }
         );
 

@@ -5,30 +5,30 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace PersistentJobs;
 
-public class JobService
+public class DeferredQueue
 {
     private readonly TaskQueue queue;
     private readonly Dictionary<string, Invokable> methods = new();
     private readonly IServiceProvider services;
 
-    public record JobServiceOpts(int MaxParallelizationCount = 8)
+    public record DeferredQueueOpts(int MaxParallelizationCount = 8)
     {
     }
 
-    internal JobService(JobServiceOpts opts, IServiceProvider services)
+    internal DeferredQueue(DeferredQueueOpts opts, IServiceProvider services)
     {
         queue = new(opts.MaxParallelizationCount);
         this.services = services;
         methods = BuildMethodsCache();
     }
 
-    public async Task StopAsync()
+    public async Task CancelAsync()
     {
         queue.Cancel();
         await queue.Process();
     }
 
-    public async Task RunAsync()
+    public async Task ProcessAsync()
     {
         // List<PersistentJob> unstarted;
         using var scope = services.CreateScope();
@@ -158,7 +158,7 @@ public class JobService
         }
     }
 
-    public async static Task<Deferred> AddTask(
+    public async static Task<Deferred> Enqueue(
         DbContext context,
         Delegate method,
         object? input = null,
@@ -168,7 +168,7 @@ public class JobService
         return await DeferredJob.Repository.Insert(context, method, input, opts);
     }
 
-    public async static Task<Deferred<O>> AddTask<O>(
+    public async static Task<Deferred<O>> Enqueue<O>(
         DbContext context,
         Delegate method,
         object input,

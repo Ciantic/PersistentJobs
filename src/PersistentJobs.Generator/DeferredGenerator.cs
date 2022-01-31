@@ -105,7 +105,7 @@ namespace PersistentJobs.Generator
                                 DeferredOptions? opts = null
                             ) 
                             {{
-                                return await JobService.AddTask{addTaskGeneric}(context, {methodName}, {inputParam}, opts);
+                                return await DeferredQueue.Enqueue{addTaskGeneric}(context, {methodName}, {inputParam}, opts);
                             }}
                         }}
                     }}
