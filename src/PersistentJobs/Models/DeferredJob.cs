@@ -93,10 +93,11 @@ internal class DeferredJob
         internal async static Task<Deferred> Insert(
             DbContext context,
             Delegate method,
-            object? input
+            object? input = null,
+            DeferredOptions? opts = null
         )
         {
-            var job = CreateFromMethod(method, input);
+            var job = CreateFromMethod(method, input, opts);
             await context.Set<DeferredJob>().AddAsync(job);
             return new Deferred(job.Id);
         }
@@ -104,10 +105,11 @@ internal class DeferredJob
         internal async static Task<Deferred<O>> Insert<O>(
             DbContext context,
             Delegate method,
-            object input
+            object? input = null,
+            DeferredOptions? opts = null
         )
         {
-            var job = CreateFromMethod(method, input);
+            var job = CreateFromMethod(method, input, opts);
             await context.Set<DeferredJob>().AddAsync(job);
             return new Deferred<O>(job.Id);
         }
@@ -229,7 +231,11 @@ internal class DeferredJob
         return Attempts >= MaxAttempts;
     }
 
-    static private DeferredJob CreateFromMethod(Delegate methodDelegate, object? input)
+    static private DeferredJob CreateFromMethod(
+        Delegate methodDelegate,
+        object? input = null,
+        DeferredOptions? opts = null
+    )
     {
         var method = methodDelegate.GetMethodInfo();
         var attribute =
@@ -243,9 +249,10 @@ internal class DeferredJob
         {
             MethodName = methodName,
             InputJson = JsonSerializer.Serialize(input),
-            WaitBetweenAttempts = attribute.WaitBetweenAttempts,
-            TimeLimit = attribute.TimeLimit,
-            MaxAttempts = attribute.MaxAttempts
+            WaitBetweenAttempts = opts?.WaitBetweenAttempts ?? attribute.WaitBetweenAttempts,
+            TimeLimit = opts?.TimeLimit ?? attribute.TimeLimit,
+            MaxAttempts = opts?.MaxAttempts ?? attribute.MaxAttempts,
+            AttemptAfter = opts?.AttemptAfter
         };
     }
 }

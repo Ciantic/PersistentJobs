@@ -161,19 +161,21 @@ public class JobService
     public async static Task<Deferred> AddTask(
         DbContext context,
         Delegate method,
-        object? input = null
+        object? input = null,
+        DeferredOptions? opts = null
     )
     {
-        return await DeferredJob.Repository.Insert(context, method, input);
+        return await DeferredJob.Repository.Insert(context, method, input, opts);
     }
 
     public async static Task<Deferred<O>> AddTask<O>(
         DbContext context,
         Delegate method,
-        object input
+        object input,
+        DeferredOptions? opts = null
     )
     {
-        return await DeferredJob.Repository.Insert<O>(context, method, input);
+        return await DeferredJob.Repository.Insert<O>(context, method, input, opts);
     }
 
     private static Dictionary<string, Invokable> BuildMethodsCache()

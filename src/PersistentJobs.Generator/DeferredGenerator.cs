@@ -101,10 +101,11 @@ namespace PersistentJobs.Generator
                             
                             async public static Task<{output}> {methodName}Deferred(
                                 {inputArgOpt} 
-                                Microsoft.EntityFrameworkCore.DbContext context
+                                Microsoft.EntityFrameworkCore.DbContext context,
+                                DeferredOptions? opts = null
                             ) 
                             {{
-                                return await JobService.AddTask{addTaskGeneric}(context, {methodName}, {inputParam});
+                                return await JobService.AddTask{addTaskGeneric}(context, {methodName}, {inputParam}, opts);
                             }}
                         }}
                     }}
