@@ -243,11 +243,8 @@ internal class PersistentJob
         {
             MethodName = methodName,
             InputJson = JsonSerializer.Serialize(input),
-            WaitBetweenAttempts = TimeSpan.FromSeconds(attribute.WaitBetweenAttemptsSeconds),
-            TimeLimit =
-                attribute.TimeLimitSeconds > 0
-                    ? TimeSpan.FromSeconds(attribute.TimeLimitSeconds)
-                    : null,
+            WaitBetweenAttempts = attribute.WaitBetweenAttempts,
+            TimeLimit = attribute.TimeLimit,
             MaxAttempts = attribute.MaxAttempts
         };
     }

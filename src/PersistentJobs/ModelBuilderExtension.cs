@@ -8,5 +8,6 @@ public static class ModelBuilderExtension
     {
         PersistentJob.ConfigureModelBuilder(modelBuilder);
         PersistentJobException.ConfigureModelBuilder(modelBuilder);
+        CronJob.ConfigureModelBuilder(modelBuilder);
     }
 }

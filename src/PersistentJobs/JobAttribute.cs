@@ -6,6 +6,18 @@ namespace PersistentJobs;
 public class JobAttribute : Attribute
 {
     public uint MaxAttempts { get; set; } = 1;
-    public uint TimeLimitSeconds { get; set; } = 0; // 2147483 = int.MaxValue / 1000
+
+    public uint TimeLimitSeconds { get; set; } = 0;
+
     public uint WaitBetweenAttemptsSeconds { get; set; } = 0;
+
+    public TimeSpan? TimeLimit
+    {
+        get { return TimeLimitSeconds > 0 ? TimeSpan.FromSeconds(TimeLimitSeconds) : null; }
+    }
+
+    public TimeSpan WaitBetweenAttempts
+    {
+        get { return TimeSpan.FromSeconds(WaitBetweenAttemptsSeconds); }
+    }
 }
