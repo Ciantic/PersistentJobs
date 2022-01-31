@@ -2,46 +2,30 @@ using System.Data;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.VisualBasic;
 
 namespace PersistentJobs;
 
-public class JobService : IHostedService
+public class JobService
 {
     private readonly TaskQueue queue;
     private readonly Dictionary<string, Invokable> methods = new();
-    private Timer? timer;
     private readonly IServiceProvider services;
 
     public record JobServiceOpts(int MaxParallelizationCount = 8)
     {
     }
 
-    public JobService(JobServiceOpts opts, IServiceProvider services)
+    internal JobService(JobServiceOpts opts, IServiceProvider services)
     {
         queue = new(opts.MaxParallelizationCount);
         this.services = services;
         methods = BuildMethodsCache();
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    public async Task StopAsync()
     {
-        timer = new Timer(Tick, null, 0, Timeout.Infinite);
-        return Task.CompletedTask;
-    }
-
-    public async Task StopAsync(CancellationToken cancellationToken = default)
-    {
-        timer?.Change(Timeout.Infinite, Timeout.Infinite);
         queue.Cancel();
         await queue.Process();
-    }
-
-    private async void Tick(object? state)
-    {
-        await RunAsync();
-        timer!.Change(60000, Timeout.Infinite);
     }
 
     public async Task RunAsync()
