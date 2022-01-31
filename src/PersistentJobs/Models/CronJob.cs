@@ -12,7 +12,7 @@ internal class CronJob
     internal Guid Id { get; set; } = Guid.NewGuid();
     internal string MethodName { get; set; } = "";
     private DateTime Created { get; set; } = DateTime.UtcNow;
-    private PersistentJob? Current { get; set; } = null;
+    private DeferredJob? Current { get; set; } = null;
     private Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
     public int? Minute { get; set; } = null;
     public int? Hour { get; set; } = null;

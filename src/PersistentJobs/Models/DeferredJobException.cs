@@ -6,20 +6,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace PersistentJobs;
 
-internal class PersistentJobException
+internal class DeferredJobException
 {
     private Guid Id { get; set; } = Guid.NewGuid();
-    internal PersistentJob PersistentJob { get; set; } = null!;
+    internal DeferredJob PersistentJob { get; set; } = null!;
     internal DateTime Raised { get; set; } = DateTime.UtcNow;
     internal string Exception { get; set; } = "";
     internal string Message { get; set; } = "";
     internal string StackTrace { get; set; } = "";
 
-    private PersistentJobException() { }
+    private DeferredJobException() { }
 
     internal static void ConfigureModelBuilder(ModelBuilder modelBuilder)
     {
-        var model = modelBuilder.Entity<PersistentJobException>();
+        var model = modelBuilder.Entity<DeferredJobException>();
         model.Property(p => p.Id);
         model.HasOne(p => p.PersistentJob);
         model.Property(p => p.Exception);
@@ -28,9 +28,9 @@ internal class PersistentJobException
         model.Property(p => p.Raised);
     }
 
-    static async internal Task Insert(DbContext context, PersistentJob job, Exception ex)
+    static async internal Task Insert(DbContext context, DeferredJob job, Exception ex)
     {
-        var exj = new PersistentJobException()
+        var exj = new DeferredJobException()
         {
             Raised = DateTime.UtcNow,
             Exception = ex.GetType().FullName ?? ex.ToString(),
@@ -41,13 +41,13 @@ internal class PersistentJobException
         await context.AddAsync(exj);
     }
 
-    static async internal Task<PersistentJobException[]> GetAllForJob(
+    static async internal Task<DeferredJobException[]> GetAllForJob(
         DbContext context,
-        PersistentJob job
+        DeferredJob job
     )
     {
         return await context
-            .Set<PersistentJobException>()
+            .Set<DeferredJobException>()
             .Where(t => t.PersistentJob == job)
             .OrderBy(p => p.Raised)
             .ToArrayAsync();

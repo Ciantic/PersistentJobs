@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace PersistentJobs;
 
-internal class PersistentJob
+internal class DeferredJob
 {
     internal Guid Id { get; set; } = Guid.NewGuid();
     internal string MethodName { get; set; } = "";
@@ -23,11 +23,11 @@ internal class PersistentJob
     private uint MaxAttempts { get; set; } = 1;
     private Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
 
-    private PersistentJob() { }
+    private DeferredJob() { }
 
     internal static void ConfigureModelBuilder(ModelBuilder modelBuilder)
     {
-        var model = modelBuilder.Entity<PersistentJob>();
+        var model = modelBuilder.Entity<DeferredJob>();
         model.Property(p => p.Id);
         model.Property(p => p.MethodName);
         model.Property(p => p.InputJson);
@@ -45,10 +45,10 @@ internal class PersistentJob
 
     internal static class Repository
     {
-        async static internal Task<PersistentJob> Get(DbContext context, Guid id)
+        async static internal Task<DeferredJob> Get(DbContext context, Guid id)
         {
             var job = (
-                await context.Set<PersistentJob>().Where(p => p.Id == id).FirstOrDefaultAsync()
+                await context.Set<DeferredJob>().Where(p => p.Id == id).FirstOrDefaultAsync()
             );
             if (job == null)
             {
@@ -61,7 +61,7 @@ internal class PersistentJob
         {
             var json = (
                 await context
-                    .Set<PersistentJob>()
+                    .Set<DeferredJob>()
                     .Where(p => p.Id == id && p.Completed != null)
                     .FirstOrDefaultAsync()
             );
@@ -76,11 +76,11 @@ internal class PersistentJob
             return JsonSerializer.Deserialize<Output>(json.OutputJson);
         }
 
-        async static internal Task<List<PersistentJob>> GetAvailable(DbContext context)
+        async static internal Task<List<DeferredJob>> GetAvailable(DbContext context)
         {
             // Get all unstarted work items
             return await context
-                .Set<PersistentJob>()
+                .Set<DeferredJob>()
                 .Where(
                     p =>
                         p.Queued == null
@@ -90,26 +90,26 @@ internal class PersistentJob
                 .ToListAsync();
         }
 
-        internal async static Task<DeferredTask> Insert(
+        internal async static Task<Deferred> Insert(
             DbContext context,
             Delegate method,
             object? input
         )
         {
             var job = CreateFromMethod(method, input);
-            await context.Set<PersistentJob>().AddAsync(job);
-            return new DeferredTask(job.Id);
+            await context.Set<DeferredJob>().AddAsync(job);
+            return new Deferred(job.Id);
         }
 
-        internal async static Task<DeferredTask<O>> Insert<O>(
+        internal async static Task<Deferred<O>> Insert<O>(
             DbContext context,
             Delegate method,
             object input
         )
         {
             var job = CreateFromMethod(method, input);
-            await context.Set<PersistentJob>().AddAsync(job);
-            return new DeferredTask<O>(job.Id);
+            await context.Set<DeferredJob>().AddAsync(job);
+            return new Deferred<O>(job.Id);
         }
 
         [Serializable]
@@ -119,9 +119,9 @@ internal class PersistentJob
         }
     }
 
-    async internal Task<PersistentJobException[]> GetExceptions(DbContext context)
+    async internal Task<DeferredJobException[]> GetExceptions(DbContext context)
     {
-        return await PersistentJobException.GetAllForJob(context, this);
+        return await DeferredJobException.GetAllForJob(context, this);
     }
 
     internal TimeSpan GetTimeLimit()
@@ -211,7 +211,7 @@ internal class PersistentJob
             AttemptAfter = DateTime.UtcNow + WaitBetweenAttempts;
         }
 
-        await PersistentJobException.Insert(context, this, exception);
+        await DeferredJobException.Insert(context, this, exception);
     }
 
     internal bool IsCompleted()
@@ -229,7 +229,7 @@ internal class PersistentJob
         return Attempts >= MaxAttempts;
     }
 
-    static private PersistentJob CreateFromMethod(Delegate methodDelegate, object? input)
+    static private DeferredJob CreateFromMethod(Delegate methodDelegate, object? input)
     {
         var method = methodDelegate.GetMethodInfo();
         var attribute =
@@ -239,7 +239,7 @@ internal class PersistentJob
             );
         var methodName = method.Name;
 
-        return new PersistentJob()
+        return new DeferredJob()
         {
             MethodName = methodName,
             InputJson = JsonSerializer.Serialize(input),

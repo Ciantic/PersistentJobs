@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace PersistentJobs;
 
-public class DeferredTask
+public class Deferred
 {
     public Guid Id { get; }
 
@@ -18,7 +18,7 @@ public class DeferredTask
 
     public record DeferredTaskException(string Name, string Message, DateTime Raised);
 
-    public DeferredTask(Guid taskId)
+    public Deferred(Guid taskId)
     {
         Id = taskId;
     }
@@ -27,13 +27,13 @@ public class DeferredTask
     {
         try
         {
-            var job = await PersistentJob.Repository.Get(context, Id);
+            var job = await DeferredJob.Repository.Get(context, Id);
             var exceptions = await job.GetExceptions(context);
             return exceptions
                 .Select(p => new DeferredTaskException(p.Exception, p.Message, p.Raised))
                 .ToArray();
         }
-        catch (PersistentJob.Repository.ObjectNotFoundException)
+        catch (DeferredJob.Repository.ObjectNotFoundException)
         {
             throw new ObjectNotFoundException();
         }
@@ -47,7 +47,7 @@ public class DeferredTask
 
     async public Task<Status> GetStatus(DbContext context)
     {
-        var job = await PersistentJob.Repository.Get(context, Id);
+        var job = await DeferredJob.Repository.Get(context, Id);
         if (job.IsCompleted())
         {
             return Status.Completed;
@@ -74,16 +74,16 @@ public class DeferredTask
     }
 }
 
-public class DeferredTask<Output> : DeferredTask
+public class Deferred<Output> : Deferred
 {
-    public DeferredTask(Guid taskId) : base(taskId) { }
+    public Deferred(Guid taskId) : base(taskId) { }
 
     async public Task<Output> GetOutput(DbContext context)
     {
         // TODO: Exceptions: NotCompleted
         try
         {
-            var output = await PersistentJob.Repository.GetCompletedOutput<Output>(context, Id);
+            var output = await DeferredJob.Repository.GetCompletedOutput<Output>(context, Id);
 
             // If output *is* nullable, then returning null is fine
             if (Nullable.GetUnderlyingType(typeof(Output)) != null)
@@ -102,7 +102,7 @@ public class DeferredTask<Output> : DeferredTask
             }
             return output;
         }
-        catch (PersistentJob.Repository.ObjectNotFoundException)
+        catch (DeferredJob.Repository.ObjectNotFoundException)
         {
             throw new ObjectNotFoundException();
         }

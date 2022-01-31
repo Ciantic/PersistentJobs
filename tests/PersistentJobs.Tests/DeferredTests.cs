@@ -95,7 +95,7 @@ public class PersistentJobTests
     {
         Init();
 
-        DeferredTask<int> deferred;
+        Deferred<int> deferred;
         // Http runs in own thread and scope, creates a deferred task
         using (var httpDbContext = CreateContext())
         {
@@ -122,7 +122,7 @@ public class PersistentJobTests
         {
             var output = await deferred.GetOutput(httpDbContext);
             Assert.Equal(42 + 5, output);
-            Assert.Equal(DeferredTask.Status.Completed, await deferred.GetStatus(httpDbContext));
+            Assert.Equal(Deferred.Status.Completed, await deferred.GetStatus(httpDbContext));
         }
     }
 
@@ -132,7 +132,7 @@ public class PersistentJobTests
         Init();
 
         // Http runs in own thread and scope, creates a deferred task
-        DeferredTask<bool> deferred;
+        Deferred<bool> deferred;
 
         using (var httpDbContext = CreateContext())
         {
@@ -161,7 +161,7 @@ public class PersistentJobTests
                         using (var httpDbContext = CreateContext())
                         {
                             Assert.Equal(
-                                DeferredTask.Status.Running,
+                                Deferred.Status.Running,
                                 await deferred.GetStatus(httpDbContext)
                             );
                         }
@@ -182,7 +182,7 @@ public class PersistentJobTests
             var exceptions = await deferred.GetExceptions(httpDbContext);
             var first = exceptions.First();
             Assert.Equal("System.Threading.Tasks.TaskCanceledException", first.Name);
-            Assert.Equal(DeferredTask.Status.Failed, await deferred.GetStatus(httpDbContext));
+            Assert.Equal(Deferred.Status.Failed, await deferred.GetStatus(httpDbContext));
         }
     }
 
@@ -192,7 +192,7 @@ public class PersistentJobTests
         Init();
 
         // Http runs in own thread and scope, creates a deferred task
-        DeferredTask deferred;
+        Deferred deferred;
 
         using (var httpDbContext = CreateContext())
         {
@@ -217,7 +217,7 @@ public class PersistentJobTests
         // Then user wants to look at the value
         using (var httpDbContext = CreateContext())
         {
-            Assert.Equal(DeferredTask.Status.Completed, await deferred.GetStatus(httpDbContext));
+            Assert.Equal(Deferred.Status.Completed, await deferred.GetStatus(httpDbContext));
         }
     }
 
@@ -227,7 +227,7 @@ public class PersistentJobTests
         Init();
 
         // Http runs in own thread and scope, creates a deferred task
-        DeferredTask deferred;
+        Deferred deferred;
 
         using (var httpDbContext = CreateContext())
         {
@@ -248,18 +248,12 @@ public class PersistentJobTests
                 await service.RunAsync();
                 using (var httpDbContext = CreateContext())
                 {
-                    Assert.Equal(
-                        DeferredTask.Status.Waiting,
-                        await deferred.GetStatus(httpDbContext)
-                    );
+                    Assert.Equal(Deferred.Status.Waiting, await deferred.GetStatus(httpDbContext));
                 }
                 await service.RunAsync();
                 using (var httpDbContext = CreateContext())
                 {
-                    Assert.Equal(
-                        DeferredTask.Status.Waiting,
-                        await deferred.GetStatus(httpDbContext)
-                    );
+                    Assert.Equal(Deferred.Status.Waiting, await deferred.GetStatus(httpDbContext));
                 }
                 await service.RunAsync();
             }
@@ -269,7 +263,7 @@ public class PersistentJobTests
         using (var httpDbContext = CreateContext())
         {
             // Failed
-            Assert.Equal(DeferredTask.Status.Failed, await deferred.GetStatus(httpDbContext));
+            Assert.Equal(Deferred.Status.Failed, await deferred.GetStatus(httpDbContext));
 
             // With three exceptions
             var exceptions = await deferred.GetExceptions(httpDbContext);

@@ -72,11 +72,11 @@ namespace PersistentJobs.Generator
                 }
             }
 
-            var output = "DeferredTask";
+            var output = "Deferred";
             var addTaskGeneric = "";
             if (outputTypeName != "")
             {
-                output = $"DeferredTask<{outputTypeName}>";
+                output = $"Deferred<{outputTypeName}>";
                 addTaskGeneric = $"<{outputTypeName}>";
             }
 

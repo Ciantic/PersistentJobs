@@ -1,4 +1,4 @@
-public class DeferredJobOpts
+public class DeferredOptions
 {
     public TimeSpan? TimeLimit { get; set; } = null;
     public TimeSpan? WaitBetweenAttempts { get; set; } = null;

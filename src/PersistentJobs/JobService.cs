@@ -33,7 +33,7 @@ public class JobService
         // List<PersistentJob> unstarted;
         using var scope = services.CreateScope();
         using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
-        var availableJobs = await PersistentJob.Repository.GetAvailable(context);
+        var availableJobs = await DeferredJob.Repository.GetAvailable(context);
 
         // Start and queue each work item
         foreach (var workitem in availableJobs)
@@ -158,22 +158,22 @@ public class JobService
         }
     }
 
-    public async static Task<DeferredTask> AddTask(
+    public async static Task<Deferred> AddTask(
         DbContext context,
         Delegate method,
         object? input = null
     )
     {
-        return await PersistentJob.Repository.Insert(context, method, input);
+        return await DeferredJob.Repository.Insert(context, method, input);
     }
 
-    public async static Task<DeferredTask<O>> AddTask<O>(
+    public async static Task<Deferred<O>> AddTask<O>(
         DbContext context,
         Delegate method,
         object input
     )
     {
-        return await PersistentJob.Repository.Insert<O>(context, method, input);
+        return await DeferredJob.Repository.Insert<O>(context, method, input);
     }
 
     private static Dictionary<string, Invokable> BuildMethodsCache()
