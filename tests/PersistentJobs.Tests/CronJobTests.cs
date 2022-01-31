@@ -8,10 +8,9 @@ namespace PersistentJobs.Tests;
 public partial class Crons
 {
     [CronJob(Minute = 0)]
-    public async static Task<bool> TestEvenHours(CancellationToken cancellationToken = default)
+    public async static Task<bool> TestEvenHours()
     {
-        await Task.Delay(5000, cancellationToken);
-        return true;
+        return await Task.FromResult(true);
     }
 }
 
