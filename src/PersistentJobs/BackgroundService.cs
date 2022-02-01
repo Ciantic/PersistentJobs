@@ -13,12 +13,12 @@ public class BackgroundService : IHostedService
 
     private IServiceProvider services;
 
-    private DeferredQueue jobService;
+    private DeferredQueue deferredQueue;
 
     public BackgroundService(IServiceProvider services)
     {
         this.services = services;
-        jobService = new DeferredQueue(new(), services);
+        deferredQueue = new DeferredQueue(new(), services);
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -30,14 +30,14 @@ public class BackgroundService : IHostedService
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
         timer?.Change(Timeout.Infinite, Timeout.Infinite);
-        await jobService.CancelAsync();
+        await deferredQueue.CancelAsync();
         // queue.Cancel();
         // await queue.Process();
     }
 
     private async void Tick(object? state)
     {
-        await jobService.ProcessAsync();
+        await deferredQueue.ProcessAsync();
         timer!.Change(60000, Timeout.Infinite);
     }
 }

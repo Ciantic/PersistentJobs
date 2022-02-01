@@ -30,7 +30,6 @@ public class DeferredQueue
 
     public async Task ProcessAsync()
     {
-        // List<PersistentJob> unstarted;
         using var scope = services.CreateScope();
         using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
         var availableJobs = await DeferredJob.Repository.GetAvailable(context);
