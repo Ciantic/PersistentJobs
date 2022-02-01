@@ -18,8 +18,13 @@ public class DeferredAttribute : Attribute
         get { return TimeLimitSeconds > 0 ? TimeSpan.FromSeconds(TimeLimitSeconds) : null; }
     }
 
-    public TimeSpan WaitBetweenAttempts
+    public TimeSpan? WaitBetweenAttempts
     {
-        get { return TimeSpan.FromSeconds(WaitBetweenAttemptsSeconds); }
+        get
+        {
+            return WaitBetweenAttemptsSeconds > 0
+              ? TimeSpan.FromSeconds(WaitBetweenAttemptsSeconds)
+              : null;
+        }
     }
 }

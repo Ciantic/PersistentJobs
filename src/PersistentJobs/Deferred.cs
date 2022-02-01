@@ -38,8 +38,15 @@ public class Deferred
 
     async public Task<DeferredStatus> GetStatus(DbContext context)
     {
-        var job = await DeferredJob.Repository.Get(context, Id);
-        return job.Status;
+        try
+        {
+            var job = await DeferredJob.Repository.Get(context, Id);
+            return job.Status;
+        }
+        catch (DeferredJob.Repository.ObjectNotFoundException)
+        {
+            throw new ObjectNotFoundException();
+        }
     }
 
     [Serializable]
