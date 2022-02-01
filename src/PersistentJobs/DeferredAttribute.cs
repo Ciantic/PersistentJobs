@@ -11,6 +11,8 @@ public class DeferredAttribute : Attribute
 
     public uint WaitBetweenAttemptsSeconds { get; set; } = 0;
 
+    public uint MaxParallelizationCount { get; set; } = 0;
+
     public TimeSpan? TimeLimit
     {
         get { return TimeLimitSeconds > 0 ? TimeSpan.FromSeconds(TimeLimitSeconds) : null; }

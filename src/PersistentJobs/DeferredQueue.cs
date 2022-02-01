@@ -33,9 +33,13 @@ public class DeferredQueue
         using var scope = services.CreateScope();
         using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
         var availableJobs = await DeferredJob.Repository.GetAvailable(context);
+        await ExecuteJobsAsync(context, availableJobs);
+    }
 
+    private async Task ExecuteJobsAsync(DbContext context, List<DeferredJob> jobs)
+    {
         // Start and queue each work item
-        foreach (var workitem in availableJobs)
+        foreach (var workitem in jobs)
         {
             var invokable = methods.GetValueOrDefault(workitem.MethodName);
             if (invokable is null)
@@ -103,7 +107,6 @@ public class DeferredQueue
                     }
                 );
         }
-
         // Awaits until the queue is completed
         await queue.Process();
     }
