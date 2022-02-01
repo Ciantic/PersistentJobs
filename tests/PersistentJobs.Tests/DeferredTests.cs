@@ -122,7 +122,7 @@ public class PersistentJobTests
         {
             var output = await deferred.GetOutput(httpDbContext);
             Assert.Equal(42 + 5, output);
-            Assert.Equal(Deferred.Status.Completed, await deferred.GetStatus(httpDbContext));
+            Assert.Equal(DeferredStatus.Succeeded, await deferred.GetStatus(httpDbContext));
         }
     }
 
@@ -161,7 +161,7 @@ public class PersistentJobTests
                         using (var httpDbContext = CreateContext())
                         {
                             Assert.Equal(
-                                Deferred.Status.Running,
+                                DeferredStatus.Queued,
                                 await deferred.GetStatus(httpDbContext)
                             );
                         }
@@ -182,7 +182,7 @@ public class PersistentJobTests
             var exceptions = await deferred.GetExceptions(httpDbContext);
             var first = exceptions.First();
             Assert.Equal("System.Threading.Tasks.TaskCanceledException", first.Name);
-            Assert.Equal(Deferred.Status.Failed, await deferred.GetStatus(httpDbContext));
+            Assert.Equal(DeferredStatus.Failed, await deferred.GetStatus(httpDbContext));
         }
     }
 
@@ -217,7 +217,7 @@ public class PersistentJobTests
         // Then user wants to look at the value
         using (var httpDbContext = CreateContext())
         {
-            Assert.Equal(Deferred.Status.Completed, await deferred.GetStatus(httpDbContext));
+            Assert.Equal(DeferredStatus.Succeeded, await deferred.GetStatus(httpDbContext));
         }
     }
 
@@ -248,12 +248,12 @@ public class PersistentJobTests
                 await service.ProcessAsync();
                 using (var httpDbContext = CreateContext())
                 {
-                    Assert.Equal(Deferred.Status.Waiting, await deferred.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Waiting, await deferred.GetStatus(httpDbContext));
                 }
                 await service.ProcessAsync();
                 using (var httpDbContext = CreateContext())
                 {
-                    Assert.Equal(Deferred.Status.Waiting, await deferred.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Waiting, await deferred.GetStatus(httpDbContext));
                 }
                 await service.ProcessAsync();
             }
@@ -263,7 +263,7 @@ public class PersistentJobTests
         using (var httpDbContext = CreateContext())
         {
             // Failed
-            Assert.Equal(Deferred.Status.Failed, await deferred.GetStatus(httpDbContext));
+            Assert.Equal(DeferredStatus.Failed, await deferred.GetStatus(httpDbContext));
 
             // With three exceptions
             var exceptions = await deferred.GetExceptions(httpDbContext);

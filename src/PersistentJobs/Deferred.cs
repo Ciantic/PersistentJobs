@@ -7,15 +7,6 @@ public class Deferred
 {
     public Guid Id { get; }
 
-    public enum Status
-    {
-        Queued,
-        Running,
-        Completed,
-        Failed,
-        Waiting
-    }
-
     public record DeferredTaskException(string Name, string Message, DateTime Raised);
 
     public Deferred(Guid taskId)
@@ -45,26 +36,10 @@ public class Deferred
     //     throw new NotImplementedException();
     // }
 
-    async public Task<Status> GetStatus(DbContext context)
+    async public Task<DeferredStatus> GetStatus(DbContext context)
     {
         var job = await DeferredJob.Repository.Get(context, Id);
-        if (job.IsCompleted())
-        {
-            return Status.Completed;
-        }
-        if (job.IsQueued() && !job.IsCompleted())
-        {
-            return Status.Running;
-        }
-        if (job.IsQueued())
-        {
-            return Status.Queued;
-        }
-        if (job.MaxAttemptsReached())
-        {
-            return Status.Failed;
-        }
-        return Status.Waiting;
+        return job.Status;
     }
 
     [Serializable]

@@ -9,16 +9,17 @@ namespace PersistentJobs;
 
 internal class DeferredJob
 {
-    internal Guid Id { get; set; } = Guid.NewGuid();
-    internal string MethodName { get; set; } = "";
+    internal Guid Id { get; private set; } = Guid.NewGuid();
+    internal string MethodName { get; private set; } = "";
     private string InputJson { get; set; } = "";
     private string? OutputJson { get; set; } = null;
     private DateTime Created { get; set; } = DateTime.UtcNow;
     private DateTime? Queued { get; set; } = null;
-    private DateTime? Completed { get; set; } = null;
+    private DateTime? Finished { get; set; } = null;
     private TimeSpan? TimeLimit { get; set; } = null;
     private TimeSpan? WaitBetweenAttempts { get; set; } = null;
     private DateTime? AttemptAfter { get; set; }
+    internal DeferredStatus Status { get; private set; } = DeferredStatus.Waiting;
     private uint Attempts { get; set; } = 0;
     private uint MaxAttempts { get; set; } = 1;
     private Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
@@ -34,12 +35,19 @@ internal class DeferredJob
         model.Property(p => p.OutputJson);
         model.Property(p => p.Created);
         model.Property(p => p.Queued);
-        model.Property(p => p.Completed);
+        model.Property(p => p.Finished);
         model.Property(p => p.TimeLimit);
         model.Property(p => p.AttemptAfter);
         model.Property(p => p.Attempts);
         model.Property(p => p.WaitBetweenAttempts);
         model.Property(p => p.MaxAttempts);
+        model
+            .Property(e => e.Status)
+            .HasConversion(
+                v => v.ToString(),
+                v => (DeferredStatus)Enum.Parse(typeof(DeferredStatus), v)
+            );
+
         model.Property(p => p.ConcurrencyStamp).IsConcurrencyToken();
     }
 
@@ -62,7 +70,7 @@ internal class DeferredJob
             var json = (
                 await context
                     .Set<DeferredJob>()
-                    .Where(p => p.Id == id && p.Completed != null)
+                    .Where(p => p.Id == id && p.Status == DeferredStatus.Succeeded)
                     .FirstOrDefaultAsync()
             );
             if (json == null)
@@ -146,14 +154,9 @@ internal class DeferredJob
             throw new InvalidOperationException("Job must be queued later");
         }
 
-        if (Queued != null)
+        if (Status != DeferredStatus.Waiting)
         {
-            throw new InvalidOperationException("Job is already queued");
-        }
-
-        if (Completed != null)
-        {
-            throw new InvalidOperationException("Job is already completed");
+            throw new InvalidOperationException("Job is not waiting to be queued");
         }
 
         if (inputType != null)
@@ -172,6 +175,7 @@ internal class DeferredJob
         }
 
         Attempts += 1;
+        Status = DeferredStatus.Queued;
         Queued = DateTime.UtcNow;
         ConcurrencyStamp = Guid.NewGuid();
         return inputObject;
@@ -184,13 +188,14 @@ internal class DeferredJob
             throw new InvalidOperationException("Complete does not work for non queued items");
         }
 
-        if (Completed != null)
+        if (Finished != null)
         {
             throw new InvalidOperationException("It's already completed");
         }
 
+        Status = DeferredStatus.Succeeded;
         OutputJson = JsonSerializer.Serialize(outputValue);
-        Completed = DateTime.UtcNow;
+        Finished = DateTime.UtcNow;
         ConcurrencyStamp = Guid.NewGuid();
     }
 
@@ -201,12 +206,21 @@ internal class DeferredJob
             throw new InvalidOperationException("Only queued item can raise exceptions");
         }
 
-        if (Completed != null)
+        if (Finished != null)
         {
             throw new InvalidOperationException("Completed items can't raise exceptions");
         }
 
         Queued = null;
+        if (Attempts >= MaxAttempts)
+        {
+            Status = DeferredStatus.Failed;
+            Finished = DateTime.UtcNow;
+        }
+        else
+        {
+            Status = DeferredStatus.Waiting;
+        }
         ConcurrencyStamp = Guid.NewGuid();
         if (WaitBetweenAttempts != null)
         {
@@ -214,21 +228,6 @@ internal class DeferredJob
         }
 
         await DeferredJobException.Insert(context, this, exception);
-    }
-
-    internal bool IsCompleted()
-    {
-        return Completed != null;
-    }
-
-    internal bool IsQueued()
-    {
-        return Queued != null;
-    }
-
-    internal bool MaxAttemptsReached()
-    {
-        return Attempts >= MaxAttempts;
     }
 
     static private DeferredJob CreateFromMethod(
