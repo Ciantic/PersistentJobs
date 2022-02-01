@@ -62,7 +62,7 @@ public class DeferredQueue
             context.Entry(workitem).State = EntityState.Detached;
 
             queue
-                .Queue(
+                .Enqueue(
                     async (CancellationToken cancellationToken) =>
                     {
                         // This is run in it's own thread, and needs a new scope

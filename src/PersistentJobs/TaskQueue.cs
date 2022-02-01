@@ -89,7 +89,7 @@ internal class TaskQueue
         _maxQueueLength = maxQueueLength ?? int.MaxValue;
     }
 
-    public QueueItem Queue(Func<Task> futureTask)
+    public QueueItem Enqueue(Func<Task> futureTask)
     {
         if (_processingQueue.Count >= _maxQueueLength)
         {
@@ -100,7 +100,7 @@ internal class TaskQueue
         return queueItem;
     }
 
-    public QueueItem Queue(Func<CancellationToken, Task> futureTask)
+    public QueueItem Enqueue(Func<CancellationToken, Task> futureTask)
     {
         if (_processingQueue.Count >= _maxQueueLength)
         {
@@ -112,14 +112,14 @@ internal class TaskQueue
         return queueItem;
     }
 
-    public int GetQueueCount()
+    public int Count
     {
-        return _processingQueue.Count;
+        get { return _processingQueue.Count; }
     }
 
-    public int GetRunningCount()
+    public int RunningCount
     {
-        return _runningTasks.Count;
+        get { return _runningTasks.Count; }
     }
 
     public void Cancel()

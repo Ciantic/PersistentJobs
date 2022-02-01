@@ -21,7 +21,7 @@ public class TaskQueueTests
     {
         var n = 0;
         var t = new TaskQueue();
-        var source = t.Queue(
+        var source = t.Enqueue(
             async (cancel) =>
             {
                 await Task.Delay(80, cancel);
@@ -48,14 +48,14 @@ public class TaskQueueTests
     {
         var n = 0;
         var t = new TaskQueue();
-        var c1 = t.Queue(
+        var c1 = t.Enqueue(
             async (cancel) =>
             {
                 await Task.Delay(80, cancel);
                 n += 1;
             }
         );
-        var c2 = t.Queue(
+        var c2 = t.Enqueue(
             async (cancel) =>
             {
                 await Task.Delay(120, cancel);
@@ -75,14 +75,14 @@ public class TaskQueueTests
     {
         var n = 0;
         var t = new TaskQueue();
-        var c1 = t.Queue(
+        var c1 = t.Enqueue(
             async (cancel) =>
             {
                 await Task.Delay(80, cancel);
                 n += 1;
             }
         );
-        var c2 = t.Queue(
+        var c2 = t.Enqueue(
             async (cancel) =>
             {
                 await Task.Delay(120, cancel);
@@ -95,7 +95,7 @@ public class TaskQueueTests
 
         // Cancel the task after 40 ms
         await Task.Delay(40);
-        Assert.Equal(2, t.GetRunningCount());
+        Assert.Equal(2, t.RunningCount);
         Assert.False(c1.IsCancellationRequested());
         Assert.False(c2.IsCancellationRequested());
         t.Cancel();
@@ -104,7 +104,7 @@ public class TaskQueueTests
 
         // Cancellation should take effect shortly
         await Task.Delay(10);
-        Assert.Equal(0, t.GetRunningCount());
+        Assert.Equal(0, t.RunningCount);
 
         // Wait for queue to empty
         await t.Process();
@@ -117,13 +117,13 @@ public class TaskQueueTests
     public async Task TestQueueLength()
     {
         var t = new TaskQueue(maxQueueLength: 2);
-        t.Queue(
+        t.Enqueue(
             async () =>
             {
                 await Task.Delay(40);
             }
         );
-        t.Queue(
+        t.Enqueue(
             async () =>
             {
                 await Task.Delay(40);
@@ -131,7 +131,7 @@ public class TaskQueueTests
         );
         Assert.Throws<TaskQueue.QueueLimitReachedException>(
             () =>
-                t.Queue(
+                t.Enqueue(
                     async () =>
                     {
                         await Task.Delay(40);
@@ -148,28 +148,28 @@ public class TaskQueueTests
         var n = 0;
         // Sequential delays should ensure that tasks complete in order for
         // `n` to grow linearly
-        t.Queue(
+        t.Enqueue(
             async () =>
             {
                 await Task.Delay(40);
                 n++;
             }
         );
-        t.Queue(
+        t.Enqueue(
             async () =>
             {
                 await Task.Delay(50);
                 n++;
             }
         );
-        t.Queue(
+        t.Enqueue(
             async () =>
             {
                 await Task.Delay(60);
                 n++;
             }
         );
-        t.Queue(
+        t.Enqueue(
             async () =>
             {
                 await Task.Delay(70);
@@ -179,14 +179,14 @@ public class TaskQueueTests
 
         // Following are queued and will be run as above tasks complete
         // Task delay for the first must be 40 because 40 + 40 > 70
-        t.Queue(
+        t.Enqueue(
             async () =>
             {
                 await Task.Delay(40);
                 n++;
             }
         );
-        t.Queue(
+        t.Enqueue(
             async () =>
             {
                 await Task.Delay(50);
@@ -201,13 +201,13 @@ public class TaskQueueTests
         await Task.Delay(10);
 
         // Tasks should now be running
-        Assert.Equal(4, t.GetRunningCount());
+        Assert.Equal(4, t.RunningCount);
 
         await t.Process();
 
         // Queue and running tasks should now have ran to completion
-        Assert.Equal(0, t.GetRunningCount());
-        Assert.Equal(0, t.GetQueueCount());
+        Assert.Equal(0, t.RunningCount);
+        Assert.Equal(0, t.Count);
         Assert.Equal(6, n);
 
         /*
@@ -225,7 +225,7 @@ public class TaskQueueTests
     {
         var t = new TaskQueue();
         var atom = 0;
-        t.Queue(
+        t.Enqueue(
                 async (CancellationToken cancellationToken) =>
                 {
                     await Task.Delay(40, cancellationToken);
@@ -242,7 +242,7 @@ public class TaskQueueTests
     {
         var gotit = "";
         var t = new TaskQueue();
-        t.Queue(
+        t.Enqueue(
                 (CancellationToken token) =>
                 {
                     throw new Exception("What you did there?");
