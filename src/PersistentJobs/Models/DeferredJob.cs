@@ -239,7 +239,7 @@ internal class DeferredJob
     {
         var method = methodDelegate.GetMethodInfo();
         var attribute =
-            method.GetCustomAttribute<JobAttribute>()
+            method.GetCustomAttribute<DeferredAttribute>()
             ?? throw new InvalidOperationException(
                 $"JobAttribute must be set for method '{method.Name}'"
             );

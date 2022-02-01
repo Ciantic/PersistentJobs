@@ -7,4 +7,4 @@ namespace PersistentJobs;
 /// in that case.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method)]
-public class CreateDeferredAttribute : JobAttribute { }
+public class CreateDeferredAttribute : DeferredAttribute { }

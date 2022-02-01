@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Internal;
 namespace PersistentJobs;
 
 [AttributeUsage(AttributeTargets.Method)]
-public class JobAttribute : Attribute
+public class DeferredAttribute : Attribute
 {
     public uint MaxAttempts { get; set; } = 1;
 

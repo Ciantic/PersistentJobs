@@ -185,7 +185,7 @@ public class DeferredQueue
             .GetAssemblies()
             .SelectMany(t => t.GetTypes())
             .SelectMany(t => t.GetMethods())
-            .Select(t => (t, t.GetCustomAttributes<JobAttribute>().FirstOrDefault()))
+            .Select(t => (t, t.GetCustomAttributes<DeferredAttribute>().FirstOrDefault()))
             .Where(ma => ma.Item2 != null);
 
         foreach (var (method, attribute) in methods)
