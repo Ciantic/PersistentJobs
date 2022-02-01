@@ -71,9 +71,9 @@ internal class TaskQueue
             CancellationTokenSource.CancelAfter(afterDelay);
         }
 
-        public bool IsCancellationRequested()
+        public bool IsCancellationRequested
         {
-            return CancellationTokenSource.IsCancellationRequested;
+            get { return CancellationTokenSource.IsCancellationRequested; }
         }
     }
 

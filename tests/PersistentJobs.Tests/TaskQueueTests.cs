@@ -63,11 +63,11 @@ public class TaskQueueTests
             }
         );
 
-        Assert.False(c1.IsCancellationRequested());
-        Assert.False(c2.IsCancellationRequested());
+        Assert.False(c1.IsCancellationRequested);
+        Assert.False(c2.IsCancellationRequested);
         t.Cancel();
-        Assert.True(c1.IsCancellationRequested());
-        Assert.True(c2.IsCancellationRequested());
+        Assert.True(c1.IsCancellationRequested);
+        Assert.True(c2.IsCancellationRequested);
     }
 
     [Fact]
@@ -96,11 +96,11 @@ public class TaskQueueTests
         // Cancel the task after 40 ms
         await Task.Delay(40);
         Assert.Equal(2, t.RunningCount);
-        Assert.False(c1.IsCancellationRequested());
-        Assert.False(c2.IsCancellationRequested());
+        Assert.False(c1.IsCancellationRequested);
+        Assert.False(c2.IsCancellationRequested);
         t.Cancel();
-        Assert.True(c1.IsCancellationRequested());
-        Assert.True(c2.IsCancellationRequested());
+        Assert.True(c1.IsCancellationRequested);
+        Assert.True(c2.IsCancellationRequested);
 
         // Cancellation should take effect shortly
         await Task.Delay(10);
