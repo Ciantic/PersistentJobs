@@ -8,7 +8,7 @@ namespace PersistentJobs.Tests;
 
 public partial class Crons
 {
-    [CronJob(Minute = 0)]
+    [Cron(Minute = 0)]
     public async static Task<bool> TestEvenHours()
     {
         return await Task.FromResult(true);
