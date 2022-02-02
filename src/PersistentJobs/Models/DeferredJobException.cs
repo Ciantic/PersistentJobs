@@ -11,7 +11,7 @@ internal class DeferredJobException
     private Guid Id { get; set; } = Guid.NewGuid();
     internal DeferredJob PersistentJob { get; set; } = null!;
     internal DateTime Raised { get; set; } = DateTime.UtcNow;
-    internal string Exception { get; set; } = "";
+    internal string Name { get; set; } = "";
     internal string Message { get; set; } = "";
     internal string StackTrace { get; set; } = "";
 
@@ -22,7 +22,7 @@ internal class DeferredJobException
         var model = modelBuilder.Entity<DeferredJobException>();
         model.Property(p => p.Id);
         model.HasOne(p => p.PersistentJob);
-        model.Property(p => p.Exception);
+        model.Property(p => p.Name);
         model.Property(p => p.Message);
         model.Property(p => p.StackTrace);
         model.Property(p => p.Raised);
@@ -33,7 +33,7 @@ internal class DeferredJobException
         var exj = new DeferredJobException()
         {
             Raised = DateTime.UtcNow,
-            Exception = ex.GetType().FullName ?? ex.ToString(),
+            Name = ex.GetType().FullName ?? ex.ToString(),
             Message = ex.Message,
             StackTrace = ex.StackTrace ?? "",
             PersistentJob = job

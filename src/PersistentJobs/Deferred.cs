@@ -21,7 +21,7 @@ public class Deferred
             var job = await DeferredJob.Repository.Get(context, Id);
             var exceptions = await job.GetExceptions(context);
             return exceptions
-                .Select(p => new DeferredTaskException(p.Exception, p.Message, p.Raised))
+                .Select(p => new DeferredTaskException(p.Name, p.Message, p.Raised))
                 .ToArray();
         }
         catch (DeferredJob.Repository.ObjectNotFoundException)
