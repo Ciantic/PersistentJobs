@@ -25,9 +25,12 @@ public class Worker
 {
     public static Task<Deferred> SendEmailDeferred(string input, DbContext dbContext) {
         // Code and method generated
+
+        // Returns `Deferred` which allows to query is it ready? What is the
+        // output value? What are the exceptions? It does not allow to await
+        // for the task to finish.
     }
 
-    // Returns `Deferred` which allows to query is it ready? What is the output value? What are the exceptions? It does not allow to await for the task to finish.
 }
 ```
 
@@ -57,3 +60,8 @@ public partial class Worker
 
 }
 ```
+
+## Notes
+
+-   Stream success or exceptions from `Deferred`?
+-   Channel for incoming Deferred tasks instead of polling?
