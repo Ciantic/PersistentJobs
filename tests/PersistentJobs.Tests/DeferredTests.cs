@@ -59,6 +59,12 @@ public partial class Worker
         return Task.FromResult(true);
     }
 
+    [CreateDeferred(MaxParallelizationCount = 2)]
+    public static Task<bool> SingleRunningMethod2()
+    {
+        return Task.FromResult(true);
+    }
+
     [System.Serializable]
     public class MyException : System.Exception
     {
@@ -328,6 +334,56 @@ public class PersistentJobTests
                     Assert.Equal(DeferredStatus.Succeeded, await d2.GetStatus(httpDbContext));
                     Assert.Equal(DeferredStatus.Waiting, await d3.GetStatus(httpDbContext));
                     Assert.Equal(DeferredStatus.Waiting, await d4.GetStatus(httpDbContext));
+                }
+            }
+        );
+    }
+
+    [Fact]
+    async public void TestMaxParallelizationByMethod2()
+    {
+        Init();
+
+        // Http runs in own thread and scope, creates a deferred task
+        Deferred d1,
+            d2,
+            d3,
+            d4;
+
+        using (var httpDbContext = CreateContext())
+        {
+            d1 = await Worker.SingleRunningMethod2Deferred(httpDbContext);
+            d2 = await Worker.SingleRunningMethod2Deferred(httpDbContext);
+            d3 = await Worker.SingleRunningMethod2Deferred(httpDbContext);
+            d4 = await Worker.SingleRunningMethod2Deferred(httpDbContext);
+            await httpDbContext.SaveChangesAsync();
+        }
+
+        // Sometime later, the service runs the deferred tasks autonomusly (to
+        // speed things up we call it manually)
+        await Task.Run(
+            async () =>
+            {
+                // Background service runs in own thread and scope
+                var services = new ServiceCollection();
+                services.AddScoped((pr) => CreateContext());
+                var provider = services.BuildServiceProvider();
+                var service = new DeferredQueue(opts: new(), provider);
+                await service.ProcessAsync();
+                using (var httpDbContext = CreateContext())
+                {
+                    Assert.Equal(DeferredStatus.Succeeded, await d1.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Succeeded, await d2.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Waiting, await d3.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Waiting, await d4.GetStatus(httpDbContext));
+                }
+                await service.ProcessAsync();
+                using (var httpDbContext = CreateContext())
+                {
+                    Assert.Equal(DeferredStatus.Succeeded, await d1.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Succeeded, await d2.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Succeeded, await d3.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Succeeded, await d4.GetStatus(httpDbContext));
                 }
             }
         );
