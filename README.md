@@ -2,7 +2,7 @@
 
 Does not work yet, don't try.
 
-##
+## Usage with source generator attribute `CreateDeferred`
 
 With a static method returning Task, e.g.
 
@@ -23,26 +23,36 @@ It generates corresponding public method with `Deferred` suffix:
 ```c#
 public partial class Worker
 {
-    public static DeferredTask SendEmailDeferred(string input, DbContext dbContext)
-    {
-        // Returns deferred task that allows to query is it ready? What is the output value? It does not allow to await for the task to finish.
+    public static Task<Deferred> SendEmailDeferred(string input, DbContext dbContext) {
+
     }
+    // Returns `Deferred` which allows to query is it ready? What is the output value? What are the exceptions? It does not allow to await for the task to finish.
 }
 ```
 
-Generated method stores the call to the database, in effect deferring it's execution until the `JobService` executes it.
+Generated method stores the call to the database, in effect deferring it's execution until the `DeferredQueue` executes it.
 
-It's notable that it omits the `IEmailSender`, because it replaces the function with a version which just stores the task in the database.
+It's notable that it omits the `IEmailSender` and other paramters in original method, because it replaces the function with a version which just stores the task in the database.
 
-<!--
-as well as an IJob:
+## Usage without source generator
+
+It's also rather easy to use deferred execution without the source generator.
+
+One only need to call `DeferredQueue.Enqueue` with method delegate having attribute `DeferredAttribute`, e.g.
 
 ```C#
-public class Example : IJob<int, bool>
+public partial class Worker
 {
-    public Task<IJobRunning<bool>> StartAsync(int input)
+    [Deferred]
+    private static Task SendEmail(string input, IEmailSender sender)
     {
         // Your code...
+        return Task.CompletedTask;
     }
+
+    public static Task<Deferred> SendEmailDeferred(string input, DbContext dbContext) {
+        await DeferredQueue.Enqueue(dbContext, SendEmail, input);
+    }
+
 }
-``` -->
+```
