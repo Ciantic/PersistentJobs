@@ -104,13 +104,13 @@ public class DeferredQueue
                         }
                     }
                 )
-                .WithTimeLimit(workitem.GetTimeLimit())
-                .WithExceptionHandler(
-                    ex =>
-                    {
-                        Console.WriteLine(ex);
-                    }
-                );
+                .WithTimeLimit(workitem.GetTimeLimit());
+            // .WithExceptionHandler(
+            //     ex =>
+            //     {
+            //         Console.WriteLine(ex);
+            //     }
+            // );
         }
         // Awaits until the queue is completed
         await queue.Process();
@@ -172,6 +172,7 @@ public class DeferredQueue
         DeferredOptions? opts = null
     )
     {
+        ValidateDelegate(method);
         return await DeferredJob.Repository.Insert(context, method, input, opts);
     }
 
@@ -182,7 +183,31 @@ public class DeferredQueue
         DeferredOptions? opts = null
     )
     {
+        ValidateDelegate(method);
         return await DeferredJob.Repository.Insert<O>(context, method, input, opts);
+    }
+
+    private static void ValidateDelegate(Delegate method)
+    {
+        var info = method.GetMethodInfo();
+        if (!info.IsStatic)
+        {
+            throw new InvalidOperationException("Persistent jobs work only on static methods.");
+        }
+
+        if (!info.IsPublic)
+        {
+            throw new InvalidOperationException(
+                $"Deferred method '{info.Name}' needs to be public."
+            );
+        }
+
+        if (info.GetCustomAttribute<DeferredAttribute>() is null)
+        {
+            throw new InvalidOperationException(
+                $"Deferred method '{info.Name}' needs to have `DeferredAttribute`."
+            );
+        }
     }
 
     private void BuildMethodsCache()
@@ -191,7 +216,7 @@ public class DeferredQueue
             .GetAssemblies()
             .SelectMany(t => t.GetTypes())
             .SelectMany(t => t.GetMethods())
-            .Select(t => (t, t.GetCustomAttributes<DeferredAttribute>().FirstOrDefault()))
+            .Select(t => (t, t.GetCustomAttribute<DeferredAttribute>()))
             .Where(ma => ma.Item2 != null);
 
         foreach (var (method, attribute) in methodInfos)
@@ -201,6 +226,11 @@ public class DeferredQueue
             if (!method.IsStatic)
             {
                 throw new Exception("Persistent jobs work only on static methods.");
+            }
+
+            if (!method.IsPublic)
+            {
+                throw new Exception($"Deferred method '{method.Name}' needs to be public.");
             }
 
             if (methods.ContainsKey(key))

@@ -10,7 +10,7 @@ With a static method returning Task, e.g.
 public partial class Worker
 {
     [CreateDeferred]
-    private static Task SendEmail(string input, IEmailSender sender)
+    public static Task SendEmail(string input, IEmailSender sender)
     {
         // Your code...
         return Task.CompletedTask;
@@ -48,7 +48,7 @@ One only need to call `DeferredQueue.Enqueue` with method delegate having attrib
 public partial class Worker
 {
     [Deferred]
-    private static Task SendEmail(string input, IEmailSender sender)
+    public static Task SendEmail(string input, IEmailSender sender)
     {
         // Your code...
         return Task.CompletedTask;
