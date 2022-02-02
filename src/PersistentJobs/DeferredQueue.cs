@@ -9,6 +9,7 @@ public class DeferredQueue
 {
     private readonly TaskQueue queue;
     private readonly Dictionary<string, Invokable> methods = new();
+    private readonly Dictionary<string, uint> maxParellelizationByMethod = new();
     private readonly IServiceProvider services;
 
     public record DeferredQueueOpts(int MaxParallelizationCount = 8)
@@ -19,7 +20,7 @@ public class DeferredQueue
     {
         queue = new(opts.MaxParallelizationCount);
         this.services = services;
-        methods = BuildMethodsCache();
+        BuildMethodsCache();
     }
 
     public async Task CancelAsync()
@@ -32,7 +33,11 @@ public class DeferredQueue
     {
         using var scope = services.CreateScope();
         using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
-        var availableJobs = await DeferredJob.Repository.GetAvailable(context);
+
+        var availableJobs = await DeferredJob.Repository.GetAvailable(
+            context,
+            maxParellelizationByMethod
+        );
         await ExecuteJobsAsync(context, availableJobs);
     }
 
@@ -180,18 +185,16 @@ public class DeferredQueue
         return await DeferredJob.Repository.Insert<O>(context, method, input, opts);
     }
 
-    private static Dictionary<string, Invokable> BuildMethodsCache()
+    private void BuildMethodsCache()
     {
-        Dictionary<string, Invokable> cache = new();
-
-        var methods = AppDomain.CurrentDomain
+        var methodInfos = AppDomain.CurrentDomain
             .GetAssemblies()
             .SelectMany(t => t.GetTypes())
             .SelectMany(t => t.GetMethods())
             .Select(t => (t, t.GetCustomAttributes<DeferredAttribute>().FirstOrDefault()))
             .Where(ma => ma.Item2 != null);
 
-        foreach (var (method, attribute) in methods)
+        foreach (var (method, attribute) in methodInfos)
         {
             var key = method.Name;
 
@@ -200,7 +203,7 @@ public class DeferredQueue
                 throw new Exception("Persistent jobs work only on static methods.");
             }
 
-            if (cache.ContainsKey(key))
+            if (methods.ContainsKey(key))
             {
                 throw new Exception(
                     $"Persistent job methods need to be unique, job with name '{key}' is already defined."
@@ -239,13 +242,18 @@ public class DeferredQueue
                 skipLast = 1;
             }
 
+            if (attribute.MaxParallelizationCount > 0)
+            {
+                maxParellelizationByMethod[method.Name] = attribute.MaxParallelizationCount;
+            }
+
             var serviceTypes = parameters
                 .Skip(skip)
                 .SkipLast(skipLast)
                 .Select(t => t.ParameterType)
                 .ToArray();
 
-            cache[key] = new Invokable(
+            methods[key] = new Invokable(
                 method,
                 InputType: inputType,
                 ReturnType: retType,
@@ -253,6 +261,5 @@ public class DeferredQueue
                 HasCancellationToken: hasCancellationToken
             );
         }
-        return cache;
     }
 }

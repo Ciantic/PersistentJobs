@@ -2,6 +2,7 @@
 using System.Dynamic;
 using System.Reflection;
 using System.Runtime.Serialization;
+using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
@@ -84,18 +85,56 @@ internal class DeferredJob
             return JsonSerializer.Deserialize<Output>(json.OutputJson);
         }
 
-        async static internal Task<List<DeferredJob>> GetAvailable(DbContext context)
+        async static internal Task<List<DeferredJob>> GetAvailable(
+            DbContext context,
+            Dictionary<string, uint> maxParallelizationByMethod
+        )
         {
+            IEnumerable<string> maxMethods = maxParallelizationByMethod.Keys;
+            List<DeferredJob> jobs = new();
+
+            foreach (var (method, maxP) in maxParallelizationByMethod)
+            {
+                jobs.AddRange(
+                    (
+                        await context
+                            .Set<DeferredJob>()
+                            .Where(
+                                p =>
+                                    p.MethodName == method
+                                    && (
+                                        p.Status == DeferredStatus.Queued
+                                        || (
+                                            p.Status == DeferredStatus.Waiting
+                                            && (
+                                                p.AttemptAfter <= DateTime.UtcNow
+                                                || p.AttemptAfter == null
+                                            )
+                                        )
+                                    )
+                            )
+                            .OrderBy(p => p.Created)
+                            .Take((int)maxP)
+                            .Where(p => p.Status == DeferredStatus.Waiting)
+                            .ToListAsync()
+                    )
+                );
+            }
+
             // Get all unstarted work items
-            return await context
-                .Set<DeferredJob>()
-                .Where(
-                    p =>
-                        p.Queued == null
-                        && (p.Attempts < p.MaxAttempts)
-                        && (p.AttemptAfter <= DateTime.UtcNow || p.AttemptAfter == null)
-                )
-                .ToListAsync();
+            jobs.AddRange(
+                await context
+                    .Set<DeferredJob>()
+                    .Where(
+                        p =>
+                            p.Status == DeferredStatus.Waiting
+                            && (p.AttemptAfter <= DateTime.UtcNow || p.AttemptAfter == null)
+                            && !maxMethods.Contains(p.MethodName)
+                    )
+                    .ToListAsync()
+            );
+
+            return jobs;
         }
 
         internal async static Task<Deferred> Insert(

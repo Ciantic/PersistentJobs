@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Sdk;
 
@@ -52,6 +53,12 @@ public partial class Worker
         throw new MyException("This is a known failure");
     }
 
+    [CreateDeferred(MaxParallelizationCount = 1)]
+    public static Task<bool> SingleRunningMethod()
+    {
+        return Task.FromResult(true);
+    }
+
     [System.Serializable]
     public class MyException : System.Exception
     {
@@ -84,7 +91,8 @@ public class PersistentJobTests
     {
         var builder = new DbContextOptionsBuilder<TestDbContext>()
             .UseSqlite("DataSource=persistentjob.sqlite")
-            .EnableSensitiveDataLogging(true);
+            .EnableSensitiveDataLogging(true)
+            .UseLoggerFactory(LoggerFactory.Create(builder => builder.AddConsole()));
         var options = builder.Options;
         var context = new TestDbContext(options);
         return context;
@@ -273,6 +281,56 @@ public class PersistentJobTests
             var first = exceptions.First();
             Assert.Equal("PersistentJobs.Tests.Worker+MyException", first.Name);
         }
+    }
+
+    [Fact]
+    async public void TestMaxParallelizationByMethod()
+    {
+        Init();
+
+        // Http runs in own thread and scope, creates a deferred task
+        Deferred d1,
+            d2,
+            d3,
+            d4;
+
+        using (var httpDbContext = CreateContext())
+        {
+            d1 = await Worker.SingleRunningMethodDeferred(httpDbContext);
+            d2 = await Worker.SingleRunningMethodDeferred(httpDbContext);
+            d3 = await Worker.SingleRunningMethodDeferred(httpDbContext);
+            d4 = await Worker.SingleRunningMethodDeferred(httpDbContext);
+            await httpDbContext.SaveChangesAsync();
+        }
+
+        // Sometime later, the service runs the deferred tasks autonomusly (to
+        // speed things up we call it manually)
+        await Task.Run(
+            async () =>
+            {
+                // Background service runs in own thread and scope
+                var services = new ServiceCollection();
+                services.AddScoped((pr) => CreateContext());
+                var provider = services.BuildServiceProvider();
+                var service = new DeferredQueue(opts: new(), provider);
+                await service.ProcessAsync();
+                using (var httpDbContext = CreateContext())
+                {
+                    Assert.Equal(DeferredStatus.Succeeded, await d1.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Waiting, await d2.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Waiting, await d3.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Waiting, await d4.GetStatus(httpDbContext));
+                }
+                await service.ProcessAsync();
+                using (var httpDbContext = CreateContext())
+                {
+                    Assert.Equal(DeferredStatus.Succeeded, await d1.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Succeeded, await d2.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Waiting, await d3.GetStatus(httpDbContext));
+                    Assert.Equal(DeferredStatus.Waiting, await d4.GetStatus(httpDbContext));
+                }
+            }
+        );
     }
     // TODO: Test WaitBetweenAttempts
 

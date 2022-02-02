@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Xunit;
 
 namespace PersistentJobs.Tests;
@@ -27,7 +28,8 @@ public class CronJobTests
     {
         var builder = new DbContextOptionsBuilder<TestDbContext>()
             .UseSqlite("DataSource=cronjob.sqlite")
-            .EnableSensitiveDataLogging(true);
+            .EnableSensitiveDataLogging(true)
+            .UseLoggerFactory(LoggerFactory.Create(builder => builder.AddConsole()));
         var options = builder.Options;
         var context = new TestDbContext(options);
         return context;
