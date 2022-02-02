@@ -1,33 +1,28 @@
-using System;
-using System.ComponentModel.DataAnnotations.Schema;
-using System.Data;
 using System.Linq;
-using System.Net.Security;
-using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Xunit;
-using Xunit.Sdk;
+using static PersistentJobs.Tests.Worker;
 
 namespace PersistentJobs.Tests;
 
 public partial class Worker
 {
-    public record Input
+    public class Input
     {
         public string First { get; set; } = "";
         public string Second { get; set; } = "";
     }
 
     [CreateDeferred]
-    public static Task<int> ExampleJob(int input, DbContext dbContext)
+    public static Task<Input> ExampleJob(Input input, DbContext dbContext)
     {
-        return Task.FromResult(input + 5);
+        return Task.FromResult(
+            new Input() { First = input.First + " Append 1", Second = input.Second + " Append 2" }
+        );
     }
 
     [CreateDeferred]
@@ -109,11 +104,14 @@ public class PersistentJobTests
     {
         Init();
 
-        Deferred<int> deferred;
+        Deferred<Input> deferred;
         // Http runs in own thread and scope, creates a deferred task
         using (var httpDbContext = CreateContext())
         {
-            deferred = await Worker.ExampleJobDeferred(42, httpDbContext);
+            deferred = await Worker.ExampleJobDeferred(
+                new() { First = "First", Second = "Second" },
+                httpDbContext
+            );
             await httpDbContext.SaveChangesAsync();
         }
 
@@ -135,7 +133,8 @@ public class PersistentJobTests
         using (var httpDbContext = CreateContext())
         {
             var output = await deferred.GetOutput(httpDbContext);
-            Assert.Equal(42 + 5, output);
+            Assert.Equal("First Append 1", output.First);
+            Assert.Equal("Second Append 2", output.Second);
             Assert.Equal(DeferredStatus.Succeeded, await deferred.GetStatus(httpDbContext));
         }
     }
