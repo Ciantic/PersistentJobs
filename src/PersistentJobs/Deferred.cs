@@ -7,21 +7,19 @@ public class Deferred
 {
     public Guid Id { get; }
 
-    public record DeferredTaskException(string Name, string Message, DateTime Raised);
-
     public Deferred(Guid taskId)
     {
         Id = taskId;
     }
 
-    async public Task<DeferredTaskException[]> GetExceptions(DbContext context)
+    async public Task<DeferredException[]> GetExceptions(DbContext context)
     {
         try
         {
             var job = await DeferredJob.Repository.Get(context, Id);
             var exceptions = await job.GetExceptions(context);
             return exceptions
-                .Select(p => new DeferredTaskException(p.Name, p.Message, p.Raised))
+                .Select(p => new DeferredException(p.Name, p.Message, p.Raised))
                 .ToArray();
         }
         catch (DeferredJob.Repository.ObjectNotFoundException)
