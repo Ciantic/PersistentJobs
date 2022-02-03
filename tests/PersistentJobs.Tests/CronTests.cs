@@ -15,7 +15,7 @@ public partial class Crons
     }
 }
 
-public class CronJobTests
+public class CronTests
 {
     static internal void Init()
     {

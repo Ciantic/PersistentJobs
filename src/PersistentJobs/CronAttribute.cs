@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Internal;
 namespace PersistentJobs;
 
 [AttributeUsage(AttributeTargets.Method)]
-public class CronAttribute : Attribute
+public class CronAttribute : DeferredAttribute
 {
     public int Minute { get; set; }
     public int Hour { get; set; } = -1;

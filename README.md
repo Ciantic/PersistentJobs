@@ -2,6 +2,32 @@
 
 Does not work yet, don't try.
 
+## Use case examples
+
+-   Email queue with retry mechanism and max parallelization
+-   Resize images on background
+-   Run cleanup commands on defined cron schedule
+-   Check failed payments in subscription system
+
+## Defined behavior
+
+Two types of persistent jobs:
+
+-   Deferred jobs
+    -   Single method call
+    -   Ability to retry
+    -   Wait between failures
+    -   Max parallelization per method
+    -   Ability to delay execution
+-   Cron jobs
+    -   Uses crontabs Hour / Min / Day / Month / DayOfWeek format
+    -   Each instance schedules Deferred jobs
+    -   Can be dedfined in code and manually in database
+    -   All deferred jobs can be cron jobs
+    -   Can be disabled from database
+    -   Source defined cron jobs are recreated on start
+    -   Does not delete non-existing cron jobs
+
 ## Usage with source generator attribute `CreateDeferred`
 
 With a static method returning Task, e.g.
