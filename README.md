@@ -18,7 +18,7 @@ Two types of persistent jobs:
     -   Ability to retry
     -   Wait between failures
     -   Max parallelization per method
-    -   Execution can delayed after certain timestamp
+    -   Schedule execution after certain timestamp
     -   Atomic: Can be queued within database transaction
     -   Ignores methods not defined in the executable
     -   Does not delete non-existing deferred methods
