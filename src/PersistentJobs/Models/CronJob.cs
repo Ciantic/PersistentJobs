@@ -1,9 +1,5 @@
 using System.Data;
-using System.Dynamic;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Runtime.Serialization;
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
 namespace PersistentJobs;
@@ -19,6 +15,7 @@ internal class CronJob
     internal Guid Id { get; set; } = Guid.NewGuid();
     internal string MethodName { get; set; } = "";
     private DateTime Created { get; set; } = DateTime.UtcNow;
+    private DateTime? InSource { get; set; } = DateTime.UtcNow;
     private DeferredJob? Current { get; set; } = null;
     private Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
     public int? Minute { get; set; } = null;
@@ -58,6 +55,14 @@ internal class CronJob
                     p => methodNames.Contains(p.MethodName) && p.Type == CronType.DefinedInSource
                 )
                 .ToListAsync();
+
+            existingJobs.IntersectBy(jobs.Select(p => p.MethodName), p => p.MethodName);
+            // existingJobs.IntersectBy(o => o.MethodName, jobs, p => p.MethodName);
+
+            // var foo = existingJobs.IntersectBy<IEnumerable<CronJob>, string>(
+            //     jobs,
+            //     p => p.MethodName
+            // );
 
             foreach (var existingJob in existingJobs)
             {

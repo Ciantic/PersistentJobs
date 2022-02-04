@@ -18,14 +18,18 @@ Two types of persistent jobs:
     -   Ability to retry
     -   Wait between failures
     -   Max parallelization per method
-    -   Ability to delay execution
+    -   Execution can delayed after certain timestamp
+    -   Atomic: Can be queued within database transaction
+    -   Ignores methods not defined in the executable
+    -   Does not delete non-existing deferred methods
 -   Cron jobs
     -   Uses crontabs Hour / Min / Day / Month / DayOfWeek format
-    -   Each instance schedules Deferred jobs
-    -   Can be dedfined in code and manually in database
+    -   Cron job works by creating deferred jobs on demand
     -   All deferred jobs can be cron jobs
+    -   Can be dedfined in code and manually in database
     -   Can be disabled from database
     -   Source defined cron jobs are recreated on start
+    -   Ignores cron jobs not defined in the executable
     -   Does not delete non-existing cron jobs
 
 ## Usage with source generator attribute `CreateDeferred`
