@@ -1,6 +1,8 @@
 using System.Data;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Internal;
+using static PersistentJobs.CronService;
 
 namespace PersistentJobs;
 
@@ -14,21 +16,35 @@ internal class CronJob
 {
     internal Guid Id { get; set; } = Guid.NewGuid();
     internal string MethodName { get; set; } = "";
+    internal MethodInfo? Method { get; set; }
     private DateTime Created { get; set; } = DateTime.UtcNow;
     private DateTime? InSource { get; set; } = DateTime.UtcNow;
     private DeferredJob? Current { get; set; } = null;
+    internal int? Minute { get; set; } = null;
+    internal int? Hour { get; set; } = null;
+    internal int? Day { get; set; } = null;
+    internal int? Month { get; set; } = null;
+    internal int? DayOfWeek { get; set; } = null;
+    private bool Disabled { get; set; } = false;
+
+    private CronType Type { get; set; } = CronType.DefinedInSource;
     private Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
-    public int? Minute { get; set; } = null;
-    public int? Hour { get; set; } = null;
-    public int? Day { get; set; } = null;
-    public int? Month { get; set; } = null;
-    public int? DayOfWeek { get; set; } = null;
 
-    public bool Disabled { get; set; } = false;
+    private (string, int?, int?, int?, int?, int?) Key
+    {
+        get { return (MethodName, Minute, Hour, Day, Month, DayOfWeek); }
+    }
 
-    public CronType Type { get; set; } = CronType.DefinedInSource;
+    internal void Tick()
+    {
+        if (Current is null) { }
+    }
 
-    private CronJob() { }
+    // private DateTime GetNextTimestamp(DateTime from) {
+    //     if (Minute is not null && ) {
+
+    //     }
+    // }
 
     internal static void ConfigureModelBuilder(ModelBuilder modelBuilder)
     {
@@ -41,14 +57,25 @@ internal class CronJob
         model
             .Property(e => e.Type)
             .HasConversion(v => v.ToString(), v => (CronType)Enum.Parse(typeof(CronType), v));
+        model
+            .HasIndex(p => new { p.MethodName, p.Minute, p.Hour, p.Day, p.Month, p.DayOfWeek })
+            .IsUnique();
     }
 
     static internal class Repository
     {
         // internal static
-        static async internal Task Upsert(DbContext context, IEnumerable<CronJob> jobs)
+        static async internal Task<List<CronJob>> UpdateOrCreate(
+            DbContext context,
+            IEnumerable<CronJob> partialDefinedJobs
+        )
         {
-            var methodNames = jobs.Select(p => p.MethodName);
+            var storedJobs = new List<CronJob>();
+            var methodNames = partialDefinedJobs.Select(p => p.MethodName);
+            var existingJobsDict = new Dictionary<
+                (string, int?, int?, int?, int?, int?),
+                CronJob
+            >();
             var existingJobs = await context
                 .Set<CronJob>()
                 .Where(
@@ -56,50 +83,45 @@ internal class CronJob
                 )
                 .ToListAsync();
 
-            existingJobs.IntersectBy(jobs.Select(p => p.MethodName), p => p.MethodName);
-            // existingJobs.IntersectBy(o => o.MethodName, jobs, p => p.MethodName);
-
-            // var foo = existingJobs.IntersectBy<IEnumerable<CronJob>, string>(
-            //     jobs,
-            //     p => p.MethodName
-            // );
-
-            foreach (var existingJob in existingJobs)
+            foreach (var j in existingJobs)
             {
-                foreach (var newJob in jobs) { }
+                existingJobsDict[j.Key] = j;
             }
 
-            // return Task.CompletedTask;
+            foreach (var j in partialDefinedJobs)
+            {
+                var ej = existingJobsDict.GetValueOrDefault(j.Key);
+                if (ej != null)
+                {
+                    // Existing jobs
+                    ej.InSource = DateTime.UtcNow;
+                    storedJobs.Add(ej);
+                }
+                else
+                {
+                    // Non-existing jobs, create job
+                    storedJobs.Add(j);
+                    await context.Set<CronJob>().AddAsync(j);
+                }
+            }
+
+            await context.SaveChangesAsync();
+            return storedJobs;
         }
     }
 
-    static internal IEnumerable<CronJob> CreateFromMethod(MethodInfo method)
+    internal static CronJob CreateFromMethod(MethodInfo method, CronAttribute attr)
     {
-        var methodName = method.Name;
-        var attributes = method.GetCustomAttributes<CronAttribute>();
-        if (!attributes.Any())
+        var j = new CronJob()
         {
-            throw new InvalidOperationException(
-                $"CronAttribute must be set for method '{method.Name}'"
-            );
-        }
-
-        return attributes.Select(
-            p =>
-                new CronJob()
-                {
-                    MethodName = methodName,
-                    Minute = p.Minute,
-                    Hour = p.Hour,
-                    Day = p.Day,
-                    Month = p.Month,
-                    DayOfWeek = p.DayOfWeek,
-                    // InputJson = JsonSerializer.Serialize(input),
-                    // WaitBetweenAttempts = opts?.WaitBetweenAttempts ?? attribute.WaitBetweenAttempts,
-                    // TimeLimit = opts?.TimeLimit ?? attribute.TimeLimit,
-                    // MaxAttempts = opts?.MaxAttempts ?? attribute.MaxAttempts,
-                    // AttemptAfter = opts?.AttemptAfter
-                }
-        );
+            MethodName = method.Name,
+            Method = method,
+            Minute = attr.Minute,
+            Hour = attr.Hour,
+            Day = attr.Day,
+            Month = attr.Month,
+            DayOfWeek = attr.DayOfWeek
+        };
+        return j;
     }
 }

@@ -63,7 +63,7 @@ public class Deferred<Output> : Deferred
         // TODO: Exceptions: NotCompleted
         try
         {
-            var output = await DeferredJob.Repository.GetCompletedOutput<Output>(context, Id);
+            var output = await DeferredJob.Repository.GetOutput<Output>(context, Id);
 
             // If output *is* nullable, then returning null is fine
             if (Nullable.GetUnderlyingType(typeof(Output)) != null)

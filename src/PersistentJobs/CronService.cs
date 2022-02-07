@@ -6,28 +6,27 @@ namespace PersistentJobs;
 
 public class CronService
 {
+    private List<CronJob>? methods = null;
     private readonly IServiceProvider services;
-    private readonly Dictionary<string, (MethodInfo, CronAttribute)> methods = new();
 
     internal CronService(IServiceProvider services)
     {
         this.services = services;
-        BuildMethodsCache();
-    }
-
-    public async Task StartAsync()
-    {
-        using var scope = services.CreateScope();
-        using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
     }
 
     public async Task ProcessAsync(DbContext context)
     {
-        // context.
+        if (methods == null)
+        {
+            methods = await CronJob.Repository.UpdateOrCreate(context, BuildMethodsCache());
+        }
+
+        methods.ForEach(p => p.Tick());
     }
 
-    private void BuildMethodsCache()
+    private static IEnumerable<CronJob> BuildMethodsCache()
     {
+        List<CronJob> methods = new();
         var methodInfos = AppDomain.CurrentDomain
             .GetAssemblies()
             .SelectMany(t => t.GetTypes())
@@ -39,8 +38,10 @@ public class CronService
         {
             foreach (var attr in attributes)
             {
-                methods[method.Name] = (method, attr);
+                methods.Add(CronJob.CreateFromMethod(method, attr));
             }
         }
+
+        return methods;
     }
 }

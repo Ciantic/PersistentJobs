@@ -66,7 +66,7 @@ internal class DeferredJob
             return job;
         }
 
-        async static internal Task<Output?> GetCompletedOutput<Output>(DbContext context, Guid id)
+        async static internal Task<Output?> GetOutput<Output>(DbContext context, Guid id)
         {
             var json = (
                 await context
