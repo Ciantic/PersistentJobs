@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore.Internal;
 
 namespace PersistentJobs;
@@ -5,13 +6,17 @@ namespace PersistentJobs;
 [AttributeUsage(AttributeTargets.Method)]
 public class DeferredAttribute : Attribute
 {
+    [JsonIgnore]
     public uint MaxAttempts { get; set; } = 1;
 
+    [JsonIgnore]
     public uint TimeLimitSeconds { get; set; } = 0;
 
+    [JsonIgnore]
     public uint WaitBetweenAttemptsSeconds { get; set; } = 0;
 
-    public uint MaxParallelizationCount { get; set; } = 0;
+    [JsonIgnore]
+    virtual public uint MaxParallelizationCount { get; set; } = 0;
 
     public TimeSpan? TimeLimit
     {

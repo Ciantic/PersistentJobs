@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -10,14 +11,17 @@ namespace PersistentJobs.Tests;
 
 public partial class Crons
 {
-    public static bool Ran = false;
+    public static int Ran = 0;
 
-    [Cron(Minute = 0)]
+    [CronHourly(Minute = 12)]
     public async static Task<bool> TestEvenHours()
     {
-        Ran = true;
+        Ran += 1;
         return await Task.FromResult(true);
     }
+
+    [Deferred]
+    public async static Task DoSomething() { }
 }
 
 public class CronTests
@@ -49,10 +53,18 @@ public class CronTests
         var provider = services.BuildServiceProvider();
 
         var service = new CronService(provider);
+        var defqueue = new DeferredQueue(new DeferredQueue.DeferredQueueOpts(), provider);
         using (var httpDbContext = CreateContext())
         {
             await service.ProcessAsync(httpDbContext);
-            Assert.True(Crons.Ran);
+            await defqueue.ProcessAsync();
+            Assert.Equal(1, Crons.Ran);
+        }
+        using (var httpDbContext = CreateContext())
+        {
+            await service.ProcessAsync(httpDbContext);
+            await defqueue.ProcessAsync();
+            Assert.Equal(2, Crons.Ran);
         }
     }
 }

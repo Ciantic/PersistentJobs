@@ -167,29 +167,48 @@ public class DeferredQueue
 
     public async static Task<Deferred> Enqueue(
         DbContext context,
-        Delegate method,
+        MethodInfo method,
         object? input = null,
         DeferredOptions? opts = null
     )
     {
-        ValidateDelegate(method);
+        ValidateMethod(method);
         return await DeferredJob.Repository.Insert(context, method, input, opts);
     }
 
     public async static Task<Deferred<O>> Enqueue<O>(
         DbContext context,
-        Delegate method,
+        MethodInfo method,
         object input,
         DeferredOptions? opts = null
     )
     {
-        ValidateDelegate(method);
+        ValidateMethod(method);
         return await DeferredJob.Repository.Insert<O>(context, method, input, opts);
     }
 
-    private static void ValidateDelegate(Delegate method)
+    public async static Task<Deferred> Enqueue(
+        DbContext context,
+        Delegate methodDelegate,
+        object? input = null,
+        DeferredOptions? opts = null
+    )
     {
-        var info = method.GetMethodInfo();
+        return await Enqueue(context, methodDelegate.GetMethodInfo(), input, opts);
+    }
+
+    public async static Task<Deferred<O>> Enqueue<O>(
+        DbContext context,
+        Delegate methodDelegate,
+        object input,
+        DeferredOptions? opts = null
+    )
+    {
+        return await Enqueue<O>(context, methodDelegate.GetMethodInfo(), input, opts);
+    }
+
+    private static void ValidateMethod(MethodInfo info)
+    {
         if (!info.IsStatic)
         {
             throw new InvalidOperationException("Persistent jobs work only on static methods.");

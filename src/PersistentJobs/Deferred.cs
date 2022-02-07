@@ -7,9 +7,17 @@ public class Deferred
 {
     public Guid Id { get; }
 
+    internal DeferredJob? Job { get; }
+
     public Deferred(Guid taskId)
     {
         Id = taskId;
+    }
+
+    internal Deferred(DeferredJob job)
+    {
+        Id = job.Id;
+        Job = job;
     }
 
     async public Task<DeferredException[]> GetExceptions(DbContext context)
@@ -57,6 +65,8 @@ public class Deferred
 public class Deferred<Output> : Deferred
 {
     public Deferred(Guid taskId) : base(taskId) { }
+
+    internal Deferred(DeferredJob job) : base(job) { }
 
     async public Task<Output> GetOutput(DbContext context)
     {

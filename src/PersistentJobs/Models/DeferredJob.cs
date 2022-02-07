@@ -12,17 +12,17 @@ internal class DeferredJob
 {
     internal Guid Id { get; private set; } = Guid.NewGuid();
     internal string MethodName { get; private set; } = "";
+    internal DeferredStatus Status { get; private set; } = DeferredStatus.Waiting;
     private string InputJson { get; set; } = "";
     private string? OutputJson { get; set; } = null;
-    private DateTime Created { get; set; } = DateTime.UtcNow;
-    private DateTime? Queued { get; set; } = null;
-    private DateTime? Finished { get; set; } = null;
     private TimeSpan? TimeLimit { get; set; } = null;
     private TimeSpan? WaitBetweenAttempts { get; set; } = null;
-    private DateTime? AttemptAfter { get; set; }
-    internal DeferredStatus Status { get; private set; } = DeferredStatus.Waiting;
     private uint Attempts { get; set; } = 0;
     private uint MaxAttempts { get; set; } = 1;
+    private DateTime? AttemptAfter { get; set; }
+    private DateTime Created { get; set; } = DateTime.UtcNow;
+    private DateTime? Queued { get; set; } = null;
+    internal DateTime? Finished { get; set; } = null;
     private Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
 
     private DeferredJob() { }
@@ -139,26 +139,26 @@ internal class DeferredJob
 
         internal async static Task<Deferred> Insert(
             DbContext context,
-            Delegate method,
+            MethodInfo method,
             object? input = null,
             DeferredOptions? opts = null
         )
         {
             var job = CreateFromMethod(method, input, opts);
             await context.Set<DeferredJob>().AddAsync(job);
-            return new Deferred(job.Id);
+            return new Deferred(job);
         }
 
         internal async static Task<Deferred<O>> Insert<O>(
             DbContext context,
-            Delegate method,
+            MethodInfo method,
             object? input = null,
             DeferredOptions? opts = null
         )
         {
             var job = CreateFromMethod(method, input, opts);
             await context.Set<DeferredJob>().AddAsync(job);
-            return new Deferred<O>(job.Id);
+            return new Deferred<O>(job);
         }
 
         [Serializable]
@@ -229,7 +229,7 @@ internal class DeferredJob
 
         if (Finished != null)
         {
-            throw new InvalidOperationException("It's already completed");
+            throw new InvalidOperationException("It's already finished");
         }
 
         Status = DeferredStatus.Succeeded;
@@ -247,7 +247,7 @@ internal class DeferredJob
 
         if (Finished != null)
         {
-            throw new InvalidOperationException("Completed items can't raise exceptions");
+            throw new InvalidOperationException("Finished items can't raise exceptions");
         }
 
         Queued = null;
@@ -270,12 +270,11 @@ internal class DeferredJob
     }
 
     static private DeferredJob CreateFromMethod(
-        Delegate methodDelegate,
+        MethodInfo method,
         object? input = null,
         DeferredOptions? opts = null
     )
     {
-        var method = methodDelegate.GetMethodInfo();
         var attribute =
             method.GetCustomAttribute<DeferredAttribute>()
             ?? throw new InvalidOperationException(

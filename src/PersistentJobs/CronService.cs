@@ -1,27 +1,45 @@
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace PersistentJobs;
 
 public class CronService
 {
+    private readonly Dictionary<string, Type> schedulers;
     private List<CronJob>? methods = null;
     private readonly IServiceProvider services;
 
     internal CronService(IServiceProvider services)
     {
         this.services = services;
+        schedulers = GetSchedulers();
     }
 
     public async Task ProcessAsync(DbContext context)
     {
-        if (methods == null)
-        {
-            methods = await CronJob.Repository.UpdateOrCreate(context, BuildMethodsCache());
-        }
+        methods = await CronJob.Repository.UpdateOrCreate(
+            context,
+            methods ?? BuildMethodsCache(),
+            methods == null,
+            schedulers
+        );
 
-        methods.ForEach(p => p.Tick());
+        foreach (var m in methods)
+        {
+            await m.Schedule(context);
+        }
+        await context.SaveChangesAsync();
+    }
+
+    private static Dictionary<string, Type> GetSchedulers()
+    {
+        return AppDomain.CurrentDomain
+            .GetAssemblies()
+            .SelectMany(t => t.GetTypes())
+            .Where(t => t.IsSubclassOf(typeof(CronScheduler)))
+            .ToDictionary(t => t.Name, t => t);
     }
 
     private static IEnumerable<CronJob> BuildMethodsCache()
@@ -31,7 +49,7 @@ public class CronService
             .GetAssemblies()
             .SelectMany(t => t.GetTypes())
             .SelectMany(t => t.GetMethods())
-            .Select(t => (t, t.GetCustomAttributes<CronAttribute>()))
+            .Select(t => (t, t.GetCustomAttributes<CronScheduler>()))
             .Where(ma => ma.Item2.Any());
 
         foreach (var (method, attributes) in methodInfos)
