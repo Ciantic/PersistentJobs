@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -7,10 +8,25 @@ using Xunit.Abstractions;
 
 namespace PersistentJobs.Tests;
 
+[AttributeUsage(AttributeTargets.Method)]
+public class CronImmediately : CronScheduler
+{
+    public int Minute { get; set; } = -1;
+
+    public override DateTime? GetNextOccurrence(
+        DateTime from,
+        DbContext context,
+        IServiceProvider services
+    )
+    {
+        return DateTime.UtcNow;
+    }
+}
+
 public partial class Crons
 {
-    [CronHourly(Minute = 12)]
-    public async static Task<bool> TestEvenHours()
+    [CronImmediately]
+    public async static Task<bool> TestScheduled()
     {
         return await Task.FromResult(true);
     }
@@ -33,25 +49,33 @@ public class CronTests : BaseTests
         var services = new ServiceCollection();
         services.AddScoped((pr) => CreateContext());
         var provider = services.BuildServiceProvider();
-
         var service = new CronService(provider);
         var defqueue = new DeferredQueue(new DeferredQueue.DeferredQueueOpts(), provider);
+
         using (var httpDbContext = CreateContext())
         {
             await service.ProcessAsync(httpDbContext);
-            var jobs = await DeferredJob.Repository.GetWithMethod(httpDbContext, "TestEvenHours");
+
+            // Ensure cron service queued a single task
+            var jobs = await DeferredJob.Repository.GetWithMethod(httpDbContext, "TestScheduled");
             Assert.Single(jobs);
             Assert.Equal(DeferredStatus.Waiting, jobs[0].Status);
+
             await defqueue.ProcessAsync(httpDbContext);
-            var jobs2 = await DeferredJob.Repository.GetWithMethod(httpDbContext, "TestEvenHours");
+            var jobs2 = await DeferredJob.Repository.GetWithMethod(httpDbContext, "TestScheduled");
+
+            // Ensure it has ran
             Assert.Single(jobs);
             Assert.Equal(DeferredStatus.Succeeded, jobs2[0].Status);
         }
+
         using (var httpDbContext = CreateContext())
         {
             await service.ProcessAsync(httpDbContext);
             await defqueue.ProcessAsync(httpDbContext);
-            var jobs = await DeferredJob.Repository.GetWithMethod(httpDbContext, "TestEvenHours");
+
+            // Ensure that second is now scheduled
+            var jobs = await DeferredJob.Repository.GetWithMethod(httpDbContext, "TestScheduled");
             Assert.Equal(2, jobs.Count);
             Assert.Equal(DeferredStatus.Succeeded, jobs[1].Status);
         }
@@ -93,7 +117,7 @@ public class CronTests : BaseTests
                         'DoSomething',
                         'Manual',
                         '{{""Minute"":12}}',
-                        'CronHourly',
+                        'CronImmediately',
                         NULL
                         
                     );",

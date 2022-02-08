@@ -31,18 +31,3 @@ abstract public class CronScheduler : DeferredAttribute
         return GetType().Name;
     }
 }
-
-[AttributeUsage(AttributeTargets.Method)]
-public class CronHourly : CronScheduler
-{
-    public int Minute { get; set; } = 0;
-
-    public override DateTime? GetNextOccurrence(
-        DateTime from,
-        DbContext context,
-        IServiceProvider services
-    )
-    {
-        return DateTime.UtcNow;
-    }
-}

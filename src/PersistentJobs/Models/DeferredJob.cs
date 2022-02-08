@@ -19,7 +19,7 @@ internal class DeferredJob
     private TimeSpan? WaitBetweenAttempts { get; set; } = null;
     private uint Attempts { get; set; } = 0;
     private uint MaxAttempts { get; set; } = 1;
-    private DateTime? AttemptAfter { get; set; }
+    internal DateTime? AttemptAfter { get; set; }
     private DateTime Created { get; set; } = DateTime.UtcNow;
     private DateTime? Queued { get; set; } = null;
     internal DateTime? Finished { get; set; } = null;
