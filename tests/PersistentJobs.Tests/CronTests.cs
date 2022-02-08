@@ -11,8 +11,6 @@ namespace PersistentJobs.Tests;
 [AttributeUsage(AttributeTargets.Method)]
 public class CronImmediately : CronScheduler
 {
-    public int Minute { get; set; } = -1;
-
     public override DateTime? GetNextOccurrence(
         DateTime from,
         DbContext context,
