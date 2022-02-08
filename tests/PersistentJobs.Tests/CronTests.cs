@@ -21,7 +21,10 @@ public partial class Crons
     }
 
     [Deferred]
-    public async static Task DoSomething() { }
+    public static Task DoSomething()
+    {
+        return Task.CompletedTask;
+    }
 }
 
 public class CronTests

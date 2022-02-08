@@ -18,7 +18,7 @@ internal class CronJob
 {
     internal Guid Id { get; set; } = Guid.NewGuid();
     internal string MethodName { get; set; } = "";
-    internal MethodInfo? Method { get; set; }
+
     internal string? InputJson { get; set; } = null;
     internal string Scheduler { get; set; } = "";
     internal CronScheduler? SchedulerInstance { get; set; } = null;
@@ -43,12 +43,6 @@ internal class CronJob
                 "CronJob can only be scheduled if the SchedulerInstance is set"
             );
         }
-        if (Method is null)
-        {
-            throw new InvalidOperationException(
-                "CronJob can only be scheduled if the Method is set"
-            );
-        }
 
         if (Disabled)
         {
@@ -71,7 +65,6 @@ internal class CronJob
         }
         else
         {
-            // await context.Entry(Current).ReloadAsync();
             if (Current.Finished is not null)
             {
                 var runNextTime = SchedulerInstance.GetNextOccurrence(
@@ -120,7 +113,6 @@ internal class CronJob
         )
         {
             var storedJobs = new List<CronJob>();
-            var methodNames = partialDefinedJobs.Select(p => p.MethodName);
             var existingJobsDict = new Dictionary<(string, string, string?), CronJob>();
             var existingJobs = await context.Set<CronJob>().ToListAsync();
 
@@ -143,7 +135,6 @@ internal class CronJob
                         ej.LastInstantiated = DateTime.UtcNow;
                     }
                     ej.SchedulerInstance = j.SchedulerInstance;
-                    ej.Method = j.Method;
                     storedJobs.Add(ej);
                 }
                 else
@@ -154,7 +145,6 @@ internal class CronJob
                 }
             }
 
-            await context.SaveChangesAsync();
             return storedJobs;
         }
     }
@@ -164,7 +154,6 @@ internal class CronJob
         var j = new CronJob()
         {
             MethodName = method.Name,
-            Method = method,
             Scheduler = attr.GetName(),
             SchedulerJson = attr.Serialize(),
             SchedulerInstance = attr

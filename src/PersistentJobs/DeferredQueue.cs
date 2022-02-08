@@ -223,12 +223,12 @@ public class DeferredQueue
 
             if (!method.IsStatic)
             {
-                throw new Exception("Persistent jobs work only on static methods.");
+                throw new InvalidOperationException("Persistent jobs work only on static methods.");
             }
 
             if (!method.IsPublic)
             {
-                throw new Exception($"Deferred method '{method.Name}' needs to be public.");
+                throw new InvalidOperationException($"Deferred method '{key}' needs to be public.");
             }
 
             if (methods.ContainsKey(key))
@@ -244,7 +244,9 @@ public class DeferredQueue
             var taskType = method.ReturnType;
             if (taskType.Name != "Task" && taskType.Name != "Task`1")
             {
-                throw new Exception("Deferred methods needs to be async");
+                throw new InvalidOperationException(
+                    $"Deferred method '{key}' must return Task or Task<T>"
+                );
             }
 
             Type? retType = null;
@@ -272,7 +274,7 @@ public class DeferredQueue
 
             if (attribute.MaxParallelizationCount > 0)
             {
-                maxParellelizationByMethod[method.Name] = attribute.MaxParallelizationCount;
+                maxParellelizationByMethod[key] = attribute.MaxParallelizationCount;
             }
 
             var serviceTypes = parameters
