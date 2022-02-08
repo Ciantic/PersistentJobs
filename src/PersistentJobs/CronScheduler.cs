@@ -1,13 +1,18 @@
 using System.Runtime.Serialization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
 
 namespace PersistentJobs;
 
 [AttributeUsage(AttributeTargets.Method)]
 abstract public class CronScheduler : DeferredAttribute
 {
-    public abstract DateTime? GetNextOccurrence(DateTime from);
+    public abstract DateTime? GetNextOccurrence(
+        DateTime from,
+        DbContext context,
+        IServiceProvider services
+    );
 
     [JsonIgnore]
     override public uint MaxParallelizationCount { get; set; } = 1;
@@ -32,7 +37,11 @@ public class CronHourly : CronScheduler
 {
     public int Minute { get; set; } = 0;
 
-    public override DateTime? GetNextOccurrence(DateTime from)
+    public override DateTime? GetNextOccurrence(
+        DateTime from,
+        DbContext context,
+        IServiceProvider services
+    )
     {
         return DateTime.UtcNow;
     }

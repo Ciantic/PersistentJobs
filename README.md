@@ -137,3 +137,4 @@ public class Worker
 
 -   Stream success or exceptions from `Deferred`?
 -   Channel for incoming Deferred tasks instead of polling?
+-   The signatures are a bit odd as they work with given DbContext. This is intentional as the caller should handle transactions and saving the changes themselves. It means though that repositories are also odd, as they don't own the DbContext, but merely uses the given ones.

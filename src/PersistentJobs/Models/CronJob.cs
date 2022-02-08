@@ -26,7 +26,7 @@ internal class CronJob
     private bool Disabled { get; set; } = false;
     private CronType Type { get; set; } = CronType.DefinedInSource;
     private DeferredJob? Current { get; set; } = null;
-    private DateTime? InSource { get; set; } = DateTime.UtcNow;
+    private DateTime? LastInstantiated { get; set; } = DateTime.UtcNow;
     private DateTime Created { get; set; } = DateTime.UtcNow;
     private Guid ConcurrencyStamp { get; set; } = Guid.NewGuid();
 
@@ -35,7 +35,7 @@ internal class CronJob
         get { return (MethodName, Scheduler, SchedulerJson); }
     }
 
-    internal async Task Schedule(DbContext context)
+    internal async Task Schedule(DbContext context, IServiceProvider services)
     {
         if (SchedulerInstance is null)
         {
@@ -57,7 +57,11 @@ internal class CronJob
 
         if (Current is null)
         {
-            var runNextTime = SchedulerInstance.GetNextOccurrence(DateTime.UtcNow);
+            var runNextTime = SchedulerInstance.GetNextOccurrence(
+                DateTime.UtcNow,
+                context,
+                services
+            );
             if (runNextTime is not null && runNextTime.HasValue)
             {
                 Current =
@@ -70,7 +74,11 @@ internal class CronJob
             // await context.Entry(Current).ReloadAsync();
             if (Current.Finished is not null)
             {
-                var runNextTime = SchedulerInstance.GetNextOccurrence(DateTime.UtcNow);
+                var runNextTime = SchedulerInstance.GetNextOccurrence(
+                    DateTime.UtcNow,
+                    context,
+                    services
+                );
                 if (runNextTime is not null && runNextTime.HasValue)
                 {
                     Current =
@@ -94,7 +102,7 @@ internal class CronJob
         model.Property(p => p.ConcurrencyStamp).IsConcurrencyToken();
         model.Property(p => p.Scheduler);
         model.Property(p => p.SchedulerJson);
-        model.Property(p => p.InSource);
+        model.Property(p => p.LastInstantiated);
         model
             .Property(e => e.Type)
             .HasConversion(v => v.ToString(), v => (CronType)Enum.Parse(typeof(CronType), v));
@@ -131,7 +139,8 @@ internal class CronJob
                     // Existing jobs
                     if (initial)
                     {
-                        ej.InSource = DateTime.UtcNow;
+                        // On start, mark the existing cronjob as instantiated
+                        ej.LastInstantiated = DateTime.UtcNow;
                     }
                     ej.SchedulerInstance = j.SchedulerInstance;
                     ej.Method = j.Method;
