@@ -19,11 +19,12 @@ public class CronService
 
     public async Task ProcessAsync(DbContext context)
     {
+        // await context.Database.BeginTransactionAsync();
         methods = await CronJob.Repository.UpdateOrCreate(
             context,
-            methods ?? BuildMethodsCache(),
-            methods == null,
-            schedulers
+            currentJobs: methods ?? BuildMethodsCache(),
+            initial: methods == null,
+            schedulers: schedulers
         );
 
         foreach (var m in methods)
@@ -31,6 +32,7 @@ public class CronService
             await m.Schedule(context, services);
         }
         await context.SaveChangesAsync();
+        // await context.Database.CommitTransactionAsync();
     }
 
     private static Dictionary<string, Type> GetSchedulers()

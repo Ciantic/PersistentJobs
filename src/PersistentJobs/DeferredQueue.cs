@@ -30,11 +30,8 @@ public class DeferredQueue
         await queue.Process();
     }
 
-    public async Task ProcessAsync()
+    public async Task ProcessAsync(DbContext context)
     {
-        using var scope = services.CreateScope();
-        using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
-
         var availableJobs = await DeferredJob.Repository.GetAvailable(
             context,
             maxParellelizationByMethod

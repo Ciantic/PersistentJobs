@@ -37,7 +37,9 @@ public class BackgroundService : IHostedService
 
     private async void Tick(object? state)
     {
-        await deferredQueue.ProcessAsync();
+        using var scope = services.CreateScope();
+        using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
+        await deferredQueue.ProcessAsync(context);
         timer!.Change(60000, Timeout.Infinite);
     }
 }

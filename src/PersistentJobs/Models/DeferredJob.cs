@@ -66,6 +66,20 @@ internal class DeferredJob
             return job;
         }
 
+        async static internal Task<List<DeferredJob>> GetWithMethod(
+            DbContext context,
+            string methodName
+        )
+        {
+            var jobs = (
+                await context
+                    .Set<DeferredJob>()
+                    .Where(p => p.MethodName == methodName)
+                    .ToListAsync()
+            );
+            return jobs;
+        }
+
         async static internal Task<Output?> GetOutput<Output>(DbContext context, Guid id)
         {
             var json = (

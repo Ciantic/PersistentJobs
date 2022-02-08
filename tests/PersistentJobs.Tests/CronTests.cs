@@ -1,51 +1,35 @@
+using System.Collections.Generic;
 using System.Reflection;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace PersistentJobs.Tests;
 
 public partial class Crons
 {
-    public static int Ran = 0;
-
     [CronHourly(Minute = 12)]
     public async static Task<bool> TestEvenHours()
     {
-        Ran += 1;
         return await Task.FromResult(true);
     }
 
     [Deferred]
-    public static Task DoSomething()
+    public static Task<bool> DoSomething()
     {
-        return Task.CompletedTask;
+        return Task.FromResult(true);
     }
 }
 
-public class CronTests
+public class CronTests : BaseTests
 {
-    static internal void Init()
-    {
-        var context = CreateContext();
-        context.Database.EnsureDeleted();
-        context.Database.EnsureCreated();
-    }
-
-    static public DbContext CreateContext()
-    {
-        var builder = new DbContextOptionsBuilder<TestDbContext>()
-            .UseSqlite("DataSource=cronjob.sqlite")
-            .EnableSensitiveDataLogging(true)
-            .UseLoggerFactory(LoggerFactory.Create(builder => builder.AddConsole()));
-        var options = builder.Options;
-        var context = new TestDbContext(options);
-        return context;
-    }
+    public CronTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
     async public void TestCronJob()
@@ -60,14 +44,74 @@ public class CronTests
         using (var httpDbContext = CreateContext())
         {
             await service.ProcessAsync(httpDbContext);
-            await defqueue.ProcessAsync();
-            Assert.Equal(1, Crons.Ran);
+            var jobs = await DeferredJob.Repository.GetWithMethod(httpDbContext, "TestEvenHours");
+            Assert.Single(jobs);
+            Assert.Equal(DeferredStatus.Waiting, jobs[0].Status);
+            await defqueue.ProcessAsync(httpDbContext);
+            var jobs2 = await DeferredJob.Repository.GetWithMethod(httpDbContext, "TestEvenHours");
+            Assert.Single(jobs);
+            Assert.Equal(DeferredStatus.Succeeded, jobs2[0].Status);
         }
         using (var httpDbContext = CreateContext())
         {
             await service.ProcessAsync(httpDbContext);
-            await defqueue.ProcessAsync();
-            Assert.Equal(2, Crons.Ran);
+            await defqueue.ProcessAsync(httpDbContext);
+            var jobs = await DeferredJob.Repository.GetWithMethod(httpDbContext, "TestEvenHours");
+            Assert.Equal(2, jobs.Count);
+            Assert.Equal(DeferredStatus.Succeeded, jobs[1].Status);
+        }
+    }
+
+    [Fact]
+    async public void TestManualCronJob()
+    {
+        Init();
+        var services = new ServiceCollection();
+        services.AddScoped((pr) => CreateContext());
+        var provider = services.BuildServiceProvider();
+
+        var service = new CronService(provider);
+        var defqueue = new DeferredQueue(new(), provider);
+        using (var httpDbContext = CreateContext())
+        {
+            await httpDbContext.Database.ExecuteSqlRawAsync(
+                @"INSERT INTO CronJob (
+                        Id,
+                        ConcurrencyStamp,
+                        Created,
+                        LastInstantiated,
+                        CurrentId,
+                        Disabled,
+                        MethodName,
+                        Type,
+                        SchedulerJson,
+                        Scheduler,
+                        InputJson
+                    )
+                    VALUES (
+                        '1238E9CE-BA88-427F-A904-D17EB7A278C6',
+                        '1230C2A8-E960-485A-9E56-C7DC240D22DC',
+                        '2022-02-08 19:21:39.3046237',
+                        NULL,
+                        NULL,
+                        0,
+                        'DoSomething',
+                        'Manual',
+                        '{{""Minute"":12}}',
+                        'CronHourly',
+                        NULL
+                        
+                    );",
+                new List<object> { }
+            );
+        }
+        using (var httpDbContext = CreateContext())
+        {
+            await service.ProcessAsync(httpDbContext);
+            await defqueue.ProcessAsync(httpDbContext);
+            var jobs = await DeferredJob.Repository.GetWithMethod(httpDbContext, "DoSomething");
+            Assert.Single(jobs);
+            Assert.Equal(DeferredStatus.Succeeded, jobs[0].Status);
         }
     }
 }

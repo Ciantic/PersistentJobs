@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
+using Xunit.Abstractions;
 using static PersistentJobs.Tests.Worker;
 
 namespace PersistentJobs.Tests;
@@ -79,25 +80,9 @@ public class TestDbContext : DbContext
     }
 }
 
-public class PersistentJobTests
+public class PersistentJobTests : BaseTests
 {
-    static internal void Init()
-    {
-        var context = CreateContext();
-        context.Database.EnsureDeleted();
-        context.Database.EnsureCreated();
-    }
-
-    static public DbContext CreateContext()
-    {
-        var builder = new DbContextOptionsBuilder<TestDbContext>()
-            .UseSqlite("DataSource=persistentjob.sqlite")
-            .EnableSensitiveDataLogging(true)
-            .UseLoggerFactory(LoggerFactory.Create(builder => builder.AddConsole()));
-        var options = builder.Options;
-        var context = new TestDbContext(options);
-        return context;
-    }
+    public PersistentJobTests(ITestOutputHelper output) : base(output) { }
 
     [Fact]
     async public void TestExampleJob()
@@ -125,7 +110,8 @@ public class PersistentJobTests
                 services.AddScoped((pr) => CreateContext());
                 var provider = services.BuildServiceProvider();
                 var service = new DeferredQueue(opts: new(), provider);
-                await service.ProcessAsync();
+                using var context = provider.GetRequiredService<DbContext>();
+                await service.ProcessAsync(context);
             }
         );
 
@@ -163,7 +149,10 @@ public class PersistentJobTests
                 services.AddScoped((pr) => CreateContext());
                 var provider = services.BuildServiceProvider();
                 var service = new DeferredQueue(opts: new(), provider);
-                var _ = service.ProcessAsync();
+                using (var context = provider.GetRequiredService<DbContext>())
+                {
+                    var _ = service.ProcessAsync(context);
+                }
 
                 await Task.Run(
                     async () =>
@@ -223,7 +212,8 @@ public class PersistentJobTests
                 services.AddScoped((pr) => CreateContext());
                 var provider = services.BuildServiceProvider();
                 var service = new DeferredQueue(opts: new(), provider);
-                await service.ProcessAsync();
+                using var context = provider.GetRequiredService<DbContext>();
+                await service.ProcessAsync(context);
             }
         );
 
@@ -258,17 +248,19 @@ public class PersistentJobTests
                 services.AddScoped((pr) => CreateContext());
                 var provider = services.BuildServiceProvider();
                 var service = new DeferredQueue(opts: new(), provider);
-                await service.ProcessAsync();
+
                 using (var httpDbContext = CreateContext())
                 {
+                    await service.ProcessAsync(httpDbContext);
                     Assert.Equal(DeferredStatus.Waiting, await deferred.GetStatus(httpDbContext));
                 }
-                await service.ProcessAsync();
+
                 using (var httpDbContext = CreateContext())
                 {
+                    await service.ProcessAsync(httpDbContext);
                     Assert.Equal(DeferredStatus.Waiting, await deferred.GetStatus(httpDbContext));
+                    await service.ProcessAsync(httpDbContext);
                 }
-                await service.ProcessAsync();
             }
         );
 
@@ -318,17 +310,19 @@ public class PersistentJobTests
                 services.AddScoped((pr) => CreateContext());
                 var provider = services.BuildServiceProvider();
                 var service = new DeferredQueue(opts: new(), provider);
-                await service.ProcessAsync();
+
                 using (var httpDbContext = CreateContext())
                 {
+                    await service.ProcessAsync(httpDbContext);
                     Assert.Equal(DeferredStatus.Succeeded, await d1.GetStatus(httpDbContext));
                     Assert.Equal(DeferredStatus.Waiting, await d2.GetStatus(httpDbContext));
                     Assert.Equal(DeferredStatus.Waiting, await d3.GetStatus(httpDbContext));
                     Assert.Equal(DeferredStatus.Waiting, await d4.GetStatus(httpDbContext));
                 }
-                await service.ProcessAsync();
+
                 using (var httpDbContext = CreateContext())
                 {
+                    await service.ProcessAsync(httpDbContext);
                     Assert.Equal(DeferredStatus.Succeeded, await d1.GetStatus(httpDbContext));
                     Assert.Equal(DeferredStatus.Succeeded, await d2.GetStatus(httpDbContext));
                     Assert.Equal(DeferredStatus.Waiting, await d3.GetStatus(httpDbContext));
@@ -368,17 +362,19 @@ public class PersistentJobTests
                 services.AddScoped((pr) => CreateContext());
                 var provider = services.BuildServiceProvider();
                 var service = new DeferredQueue(opts: new(), provider);
-                await service.ProcessAsync();
                 using (var httpDbContext = CreateContext())
                 {
+                    await service.ProcessAsync(httpDbContext);
+
                     Assert.Equal(DeferredStatus.Succeeded, await d1.GetStatus(httpDbContext));
                     Assert.Equal(DeferredStatus.Succeeded, await d2.GetStatus(httpDbContext));
                     Assert.Equal(DeferredStatus.Waiting, await d3.GetStatus(httpDbContext));
                     Assert.Equal(DeferredStatus.Waiting, await d4.GetStatus(httpDbContext));
                 }
-                await service.ProcessAsync();
+
                 using (var httpDbContext = CreateContext())
                 {
+                    await service.ProcessAsync(httpDbContext);
                     Assert.Equal(DeferredStatus.Succeeded, await d1.GetStatus(httpDbContext));
                     Assert.Equal(DeferredStatus.Succeeded, await d2.GetStatus(httpDbContext));
                     Assert.Equal(DeferredStatus.Succeeded, await d3.GetStatus(httpDbContext));

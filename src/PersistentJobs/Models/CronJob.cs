@@ -22,7 +22,7 @@ internal class CronJob
     internal string? InputJson { get; set; } = null;
     internal string Scheduler { get; set; } = "";
     internal CronScheduler? SchedulerInstance { get; set; } = null;
-    internal string? SchedulerJson { get; set; } = null;
+    internal string SchedulerJson { get; set; } = "{}";
     private bool Disabled { get; set; } = false;
     private CronType Type { get; set; } = CronType.DefinedInSource;
     private DeferredJob? Current { get; set; } = null;
@@ -93,6 +93,7 @@ internal class CronJob
         model.Property(p => p.Created);
         model.HasOne(p => p.Current);
         model.Property(p => p.ConcurrencyStamp).IsConcurrencyToken();
+        model.Property(p => p.Disabled);
         model.Property(p => p.Scheduler);
         model.Property(p => p.SchedulerJson);
         model.Property(p => p.LastInstantiated);
@@ -107,25 +108,19 @@ internal class CronJob
         // internal static
         static async internal Task<List<CronJob>> UpdateOrCreate(
             DbContext context,
-            IEnumerable<CronJob> partialDefinedJobs,
+            IEnumerable<CronJob> currentJobs,
             bool initial,
             Dictionary<string, Type> schedulers
         )
         {
-            var storedJobs = new List<CronJob>();
-            var existingJobsDict = new Dictionary<(string, string, string?), CronJob>();
-            var existingJobs = await context.Set<CronJob>().ToListAsync();
+            var returnCronJobs = new List<CronJob>();
+            var existingJobsDict = await context
+                .Set<CronJob>()
+                .ToDictionaryAsync(p => p.Key, p => p);
 
-            // TODO: Instantiate manual cron jobs
-
-            foreach (var j in existingJobs)
+            foreach (var j in currentJobs)
             {
-                existingJobsDict[j.Key] = j;
-            }
-
-            foreach (var j in partialDefinedJobs)
-            {
-                var ej = existingJobsDict.GetValueOrDefault(j.Key);
+                existingJobsDict.Remove(j.Key, out var ej);
                 if (ej != null)
                 {
                     // Existing jobs
@@ -135,17 +130,31 @@ internal class CronJob
                         ej.LastInstantiated = DateTime.UtcNow;
                     }
                     ej.SchedulerInstance = j.SchedulerInstance;
-                    storedJobs.Add(ej);
+                    returnCronJobs.Add(ej);
                 }
                 else
                 {
                     // Non-existing jobs, create job
-                    storedJobs.Add(j);
+                    returnCronJobs.Add(j);
                     await context.Set<CronJob>().AddAsync(j);
                 }
             }
 
-            return storedJobs;
+            foreach (var j in existingJobsDict.Values)
+            {
+                var schedulerType = schedulers.GetValueOrDefault(j.Scheduler);
+                if (initial && schedulerType is not null)
+                {
+                    // On start, mark the existing cronjob as instantiated
+                    j.LastInstantiated = DateTime.UtcNow;
+                    j.SchedulerInstance =
+                        JsonSerializer.Deserialize(j.SchedulerJson, schedulerType) as CronScheduler;
+                }
+
+                returnCronJobs.Add(j);
+            }
+
+            return returnCronJobs;
         }
     }
 
