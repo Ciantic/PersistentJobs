@@ -91,6 +91,8 @@ namespace PersistentJobs.Generator
             var source = FormattableString
                 .Invariant(
                     $@"
+                    #nullable enable
+
                     using PersistentJobs;
                     using System.Threading.Tasks;
 

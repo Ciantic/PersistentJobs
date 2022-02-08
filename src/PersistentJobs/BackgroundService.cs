@@ -11,9 +11,9 @@ public class BackgroundService : IHostedService
 {
     private Timer? timer;
 
-    private IServiceProvider services;
+    private readonly IServiceProvider services;
 
-    private DeferredQueue deferredQueue;
+    private readonly DeferredQueue deferredQueue;
 
     public BackgroundService(IServiceProvider services)
     {

@@ -197,7 +197,7 @@ public class DeferredQueue
     public async static Task<Deferred<O>> Enqueue<O>(
         DbContext context,
         Delegate methodDelegate,
-        object input,
+        object? input,
         DeferredOptions? opts = null
     )
     {

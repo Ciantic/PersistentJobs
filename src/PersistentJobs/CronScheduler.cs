@@ -17,7 +17,7 @@ abstract public class CronScheduler : DeferredAttribute
     [JsonIgnore]
     override public uint MaxParallelizationCount { get; set; } = 1;
 
-    internal string? Serialize()
+    internal string Serialize()
     {
         return JsonSerializer.Serialize(
             this,
