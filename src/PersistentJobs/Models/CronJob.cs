@@ -19,6 +19,7 @@ internal class CronJob
     internal Guid Id { get; set; } = Guid.NewGuid();
     internal string MethodName { get; set; } = "";
     internal MethodInfo? Method { get; set; }
+    internal string? InputJson { get; set; } = null;
     internal string Scheduler { get; set; } = "";
     internal CronScheduler? SchedulerInstance { get; set; } = null;
     internal string? SchedulerJson { get; set; } = null;
@@ -56,41 +57,28 @@ internal class CronJob
 
         if (Current is null)
         {
-            // Create new job
-            Current =
-                (
-                    await DeferredQueue.Enqueue(
-                        context,
-                        Method,
-                        null,
-                        new DeferredOptions()
-                        {
-                            AttemptAfter = SchedulerInstance.GetNextOccurrence(DateTime.UtcNow)
-                        }
-                    )
-                ).Job;
-            ConcurrencyStamp = Guid.NewGuid();
+            var runNextTime = SchedulerInstance.GetNextOccurrence(DateTime.UtcNow);
+            if (runNextTime is not null && runNextTime.HasValue)
+            {
+                Current =
+                    (await DeferredQueue.EnqueueCronjob(context, this, (DateTime)runNextTime)).Job;
+                ConcurrencyStamp = Guid.NewGuid();
+            }
         }
         else
         {
             // await context.Entry(Current).ReloadAsync();
             if (Current.Finished is not null)
             {
-                Current =
-                    (
-                        await DeferredQueue.Enqueue(
-                            context,
-                            Method,
-                            null,
-                            new DeferredOptions()
-                            {
-                                AttemptAfter = SchedulerInstance.GetNextOccurrence(
-                                    (DateTime)Current.Finished
-                                )
-                            }
-                        )
-                    ).Job;
-                ConcurrencyStamp = Guid.NewGuid();
+                var runNextTime = SchedulerInstance.GetNextOccurrence(DateTime.UtcNow);
+                if (runNextTime is not null && runNextTime.HasValue)
+                {
+                    Current =
+                        (
+                            await DeferredQueue.EnqueueCronjob(context, this, (DateTime)runNextTime)
+                        ).Job;
+                    ConcurrencyStamp = Guid.NewGuid();
+                }
             }
         }
     }
@@ -100,6 +88,7 @@ internal class CronJob
         var model = modelBuilder.Entity<CronJob>();
         model.Property(p => p.Id);
         model.Property(p => p.MethodName);
+        model.Property(p => p.InputJson);
         model.Property(p => p.Created);
         model.HasOne(p => p.Current);
         model.Property(p => p.ConcurrencyStamp).IsConcurrencyToken();

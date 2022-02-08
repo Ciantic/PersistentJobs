@@ -13,7 +13,7 @@ internal class DeferredJob
     internal Guid Id { get; private set; } = Guid.NewGuid();
     internal string MethodName { get; private set; } = "";
     internal DeferredStatus Status { get; private set; } = DeferredStatus.Waiting;
-    private string InputJson { get; set; } = "";
+    private string? InputJson { get; set; } = "";
     private string? OutputJson { get; set; } = null;
     private TimeSpan? TimeLimit { get; set; } = null;
     private TimeSpan? WaitBetweenAttempts { get; set; } = null;
@@ -137,26 +137,14 @@ internal class DeferredJob
             return jobs;
         }
 
-        internal async static Task<Deferred> Insert(
-            DbContext context,
-            MethodInfo method,
-            object? input = null,
-            DeferredOptions? opts = null
-        )
+        internal async static Task<Deferred> Insert(DbContext context, DeferredJob job)
         {
-            var job = CreateFromMethod(method, input, opts);
             await context.Set<DeferredJob>().AddAsync(job);
             return new Deferred(job);
         }
 
-        internal async static Task<Deferred<O>> Insert<O>(
-            DbContext context,
-            MethodInfo method,
-            object? input = null,
-            DeferredOptions? opts = null
-        )
+        internal async static Task<Deferred<O>> Insert<O>(DbContext context, DeferredJob job)
         {
-            var job = CreateFromMethod(method, input, opts);
             await context.Set<DeferredJob>().AddAsync(job);
             return new Deferred<O>(job);
         }
@@ -200,6 +188,13 @@ internal class DeferredJob
 
         if (inputType != null)
         {
+            if (InputJson is null)
+            {
+                throw new InvalidOperationException(
+                    "Input type is set, the input json must be set"
+                );
+            }
+
             try
             {
                 inputObject = JsonSerializer.Deserialize(InputJson, inputType);
@@ -269,7 +264,7 @@ internal class DeferredJob
         await DeferredJobException.Insert(context, this, exception);
     }
 
-    static private DeferredJob CreateFromMethod(
+    static internal DeferredJob CreateFromMethod(
         MethodInfo method,
         object? input = null,
         DeferredOptions? opts = null
@@ -280,8 +275,20 @@ internal class DeferredJob
             ?? throw new InvalidOperationException(
                 $"DeferredAttribute must be set for method '{method.Name}'"
             );
-        var methodName = method.Name;
 
+        if (!method.IsStatic)
+        {
+            throw new InvalidOperationException("Persistent jobs work only on static methods.");
+        }
+
+        if (!method.IsPublic)
+        {
+            throw new InvalidOperationException(
+                $"Deferred method '{method.Name}' needs to be public."
+            );
+        }
+
+        var methodName = method.Name;
         return new DeferredJob()
         {
             MethodName = methodName,
@@ -289,6 +296,27 @@ internal class DeferredJob
             WaitBetweenAttempts = opts?.WaitBetweenAttempts ?? attribute.WaitBetweenAttempts,
             TimeLimit = opts?.TimeLimit ?? attribute.TimeLimit,
             MaxAttempts = opts?.MaxAttempts ?? attribute.MaxAttempts,
+            AttemptAfter = opts?.AttemptAfter
+        };
+    }
+
+    static internal DeferredJob CreateFromCronJob(CronJob job, DeferredOptions opts)
+    {
+        if (opts.AttemptAfter is null)
+        {
+            throw new InvalidOperationException(
+                "Cron jobs must be scheduled to attempt after given time"
+            );
+        }
+
+        return new DeferredJob()
+        {
+            MethodName = job.MethodName,
+            InputJson = job.InputJson,
+            WaitBetweenAttempts =
+                opts?.WaitBetweenAttempts ?? job.SchedulerInstance?.WaitBetweenAttempts,
+            TimeLimit = opts?.TimeLimit ?? job.SchedulerInstance?.TimeLimit,
+            MaxAttempts = opts?.MaxAttempts ?? job.SchedulerInstance?.MaxAttempts ?? 1,
             AttemptAfter = opts?.AttemptAfter
         };
     }

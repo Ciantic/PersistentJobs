@@ -1,5 +1,6 @@
 using System.Data;
 using System.Reflection;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -165,26 +166,24 @@ public class DeferredQueue
         }
     }
 
-    public async static Task<Deferred> Enqueue(
+    internal async static Task<Deferred> EnqueueCronjob(
         DbContext context,
-        MethodInfo method,
-        object? input = null,
-        DeferredOptions? opts = null
+        CronJob cronJob,
+        DateTime attemptAfter
     )
     {
-        ValidateMethod(method);
-        return await DeferredJob.Repository.Insert(context, method, input, opts);
-    }
+        if (cronJob.SchedulerInstance is null)
+        {
+            throw new InvalidOperationException(
+                "CronJob SchedulerInstance must be set in order to enqueue"
+            );
+        }
 
-    public async static Task<Deferred<O>> Enqueue<O>(
-        DbContext context,
-        MethodInfo method,
-        object input,
-        DeferredOptions? opts = null
-    )
-    {
-        ValidateMethod(method);
-        return await DeferredJob.Repository.Insert<O>(context, method, input, opts);
+        var deferredJob = DeferredJob.CreateFromCronJob(
+            cronJob,
+            new DeferredOptions() { AttemptAfter = attemptAfter }
+        );
+        return await DeferredJob.Repository.Insert(context, deferredJob);
     }
 
     public async static Task<Deferred> Enqueue(
@@ -194,7 +193,8 @@ public class DeferredQueue
         DeferredOptions? opts = null
     )
     {
-        return await Enqueue(context, methodDelegate.GetMethodInfo(), input, opts);
+        var job = DeferredJob.CreateFromMethod(methodDelegate.GetMethodInfo(), input, opts);
+        return await DeferredJob.Repository.Insert(context, job);
     }
 
     public async static Task<Deferred<O>> Enqueue<O>(
@@ -204,29 +204,8 @@ public class DeferredQueue
         DeferredOptions? opts = null
     )
     {
-        return await Enqueue<O>(context, methodDelegate.GetMethodInfo(), input, opts);
-    }
-
-    private static void ValidateMethod(MethodInfo info)
-    {
-        if (!info.IsStatic)
-        {
-            throw new InvalidOperationException("Persistent jobs work only on static methods.");
-        }
-
-        if (!info.IsPublic)
-        {
-            throw new InvalidOperationException(
-                $"Deferred method '{info.Name}' needs to be public."
-            );
-        }
-
-        if (info.GetCustomAttribute<DeferredAttribute>() is null)
-        {
-            throw new InvalidOperationException(
-                $"Deferred method '{info.Name}' needs to have `DeferredAttribute`."
-            );
-        }
+        var job = DeferredJob.CreateFromMethod(methodDelegate.GetMethodInfo(), input, opts);
+        return await DeferredJob.Repository.Insert<O>(context, job);
     }
 
     private void BuildMethodsCache()
