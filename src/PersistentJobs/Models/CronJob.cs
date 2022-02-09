@@ -116,6 +116,7 @@ internal class CronJob
                 .Set<CronJob>()
                 .ToDictionaryAsync(p => p.Key, p => p);
 
+            // All current jobs, which still exist in the database
             foreach (var j in currentJobs)
             {
                 existingJobsDict.Remove(j.Key, out var ej);
@@ -128,6 +129,7 @@ internal class CronJob
                         ej.LastInstantiated = DateTime.UtcNow;
                     }
                     ej.SchedulerInstance = j.SchedulerInstance;
+                    ej.ConcurrencyStamp = Guid.NewGuid();
                     returnCronJobs.Add(ej);
                 }
                 else
@@ -138,6 +140,7 @@ internal class CronJob
                 }
             }
 
+            // Remaining jobs
             foreach (var j in existingJobsDict.Values)
             {
                 var schedulerType = schedulers.GetValueOrDefault(j.Scheduler);
@@ -147,6 +150,7 @@ internal class CronJob
                     j.LastInstantiated = DateTime.UtcNow;
                     j.SchedulerInstance =
                         JsonSerializer.Deserialize(j.SchedulerJson, schedulerType) as CronScheduler;
+                    j.ConcurrencyStamp = Guid.NewGuid();
                 }
 
                 returnCronJobs.Add(j);

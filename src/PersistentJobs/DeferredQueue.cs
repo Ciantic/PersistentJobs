@@ -52,10 +52,10 @@ public class DeferredQueue
             }
 
             object? inputObject;
+            // Try to start and queue
+            inputObject = workitem.Queue(invokable.InputType);
             try
             {
-                // Try to start and queue
-                inputObject = workitem.Queue(invokable.InputType);
                 await context.SaveChangesAsync();
             }
             catch (DBConcurrencyException)

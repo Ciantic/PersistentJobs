@@ -1,7 +1,6 @@
+using System.Data;
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace PersistentJobs;
 
@@ -31,7 +30,15 @@ public class CronService
         {
             await m.Schedule(context, services);
         }
-        await context.SaveChangesAsync();
+
+        try
+        {
+            await context.SaveChangesAsync();
+        }
+        catch (DBConcurrencyException)
+        {
+            // Some other process managed to process before this
+        }
         // await context.Database.CommitTransactionAsync();
     }
 
