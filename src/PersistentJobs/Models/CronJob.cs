@@ -13,12 +13,12 @@ internal enum CronType
 internal class CronJob
 {
     internal Guid Id { get; set; } = Guid.NewGuid();
-    internal string MethodName { get; set; } = "";
+    internal string MethodName { get; private set; } = "";
 
-    internal string? InputJson { get; set; } = null;
-    internal string Scheduler { get; set; } = "";
-    internal CronScheduler? SchedulerInstance { get; set; } = null;
-    internal string SchedulerJson { get; set; } = "{}";
+    internal string? InputJson { get; private set; } = null;
+    internal string Scheduler { get; private set; } = "";
+    internal CronScheduler? SchedulerInstance { get; private set; } = null;
+    internal string SchedulerJson { get; private set; } = "{}";
     private bool Disabled { get; set; } = false;
     private CronType Type { get; set; } = CronType.DefinedInSource;
     private DeferredJob? Current { get; set; } = null;
