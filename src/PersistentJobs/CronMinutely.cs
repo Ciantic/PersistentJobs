@@ -1,16 +1,19 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace PersistentJobs;
 
 [AttributeUsage(AttributeTargets.Method)]
-public class CronHourly : CronScheduler
+public class CronMinutely : CronScheduler
 {
+    public int Minutes { get; set; } = 1;
+
     public override DateTime? GetNextOccurrence(
         DateTime from,
         DbContext? context = null,
         IServiceProvider? services = null
     )
     {
-        return from.AddHours(1);
+        return from.AddMinutes(Minutes);
     }
 }

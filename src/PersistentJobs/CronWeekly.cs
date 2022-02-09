@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 namespace PersistentJobs;
 
 [AttributeUsage(AttributeTargets.Method)]
-public class CronHourly : CronScheduler
+public class CronWeekly : CronScheduler
 {
     public override DateTime? GetNextOccurrence(
         DateTime from,
@@ -11,6 +11,6 @@ public class CronHourly : CronScheduler
         IServiceProvider? services = null
     )
     {
-        return from.AddHours(1);
+        return from.AddDays(7);
     }
 }

@@ -64,7 +64,9 @@ internal class CronJob
             if (Current.Finished is not null)
             {
                 var runNextTime = SchedulerInstance.GetNextOccurrence(
-                    DateTime.UtcNow,
+                    (DateTime)(
+                        DateTime.UtcNow > Current.Finished ? DateTime.UtcNow : Current.Finished
+                    ),
                     context,
                     services
                 );
