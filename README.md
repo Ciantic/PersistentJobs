@@ -36,7 +36,7 @@ Two types of persistent jobs:
     -   Ignores methods not defined in the source
     -   Does not delete non-existing deferred methods
 -   Cron jobs
-    -   At given minute / hour / day / month / day of week
+    -   Hourly, daily, minutely, and with custom function
     -   Cron job works by creating deferred jobs on demand
     -   All deferred jobs can be cron jobs
     -   Can be dedfined in code and manually in database
