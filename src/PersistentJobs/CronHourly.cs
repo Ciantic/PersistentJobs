@@ -5,8 +5,10 @@ namespace PersistentJobs;
 [AttributeUsage(AttributeTargets.Method)]
 public class CronHourly : CronScheduler
 {
-    public int RandomlyFrom { get; set; } = -1;
-    public int RandomlyTo { get; set; } = -1;
+    /// <summary>
+    /// Hourly intervals
+    /// </summary>
+    public int Hours { get; set; } = 1;
 
     public override DateTime? GetNextOccurrence(
         DateTime from,
@@ -14,6 +16,6 @@ public class CronHourly : CronScheduler
         IServiceProvider? services = null
     )
     {
-        return from.AddHours(1);
+        return from.AddHours(Math.Max(Hours, 1));
     }
 }

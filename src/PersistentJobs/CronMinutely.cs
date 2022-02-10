@@ -14,6 +14,6 @@ public class CronMinutely : CronScheduler
         IServiceProvider? services = null
     )
     {
-        return from.AddMinutes(Minutes);
+        return from.AddMinutes(Math.Max(Minutes, 1));
     }
 }
