@@ -31,14 +31,15 @@ public class BackgroundService : IHostedService
     {
         timer?.Change(Timeout.Infinite, Timeout.Infinite);
         await deferredQueue.CancelAsync();
-        // queue.Cancel();
-        // await queue.Process();
     }
 
     private async void Tick(object? state)
     {
+        // This is ran in new thread, services need to be scoped
         using var scope = services.CreateScope();
-        using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
+        using var context = await scope.ServiceProvider
+            .GetRequiredService<IDbContextFactory<DbContext>>()
+            .CreateDbContextAsync();
         await deferredQueue.ProcessAsync(context);
         timer!.Change(60000, Timeout.Infinite);
     }

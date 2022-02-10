@@ -44,10 +44,8 @@ public class CronTests : BaseTests
     async public void TestCronJob()
     {
         Init();
-        var services = new ServiceCollection();
-        services.AddScoped((pr) => CreateContext());
-        var provider = services.BuildServiceProvider();
-        var service = new CronService(provider);
+        var provider = ConfigureServices();
+        var service = new CronService(ConfigureServices());
         var defqueue = new DeferredQueue(new DeferredQueue.DeferredQueueOpts(), provider);
 
         using (var httpDbContext = CreateContext())
@@ -83,9 +81,7 @@ public class CronTests : BaseTests
     async public void TestManualCronJob()
     {
         Init();
-        var services = new ServiceCollection();
-        services.AddScoped((pr) => CreateContext());
-        var provider = services.BuildServiceProvider();
+        var provider = ConfigureServices();
 
         var service = new CronService(provider);
         var defqueue = new DeferredQueue(new(), provider);

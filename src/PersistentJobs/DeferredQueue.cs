@@ -71,11 +71,12 @@ public class DeferredQueue
                 .Enqueue(
                     async (CancellationToken cancellationToken) =>
                     {
-                        // This is run in it's own thread, and needs a new scope
-                        using var scope = services.CreateScope();
-                        using var context = scope.ServiceProvider.GetRequiredService<DbContext>();
+                        // This is ran in new thread, services need to be scoped
+                        using var scoped = services.CreateScope();
+                        using var context = await scoped.ServiceProvider
+                            .GetRequiredService<IDbContextFactory<DbContext>>()
+                            .CreateDbContextAsync(CancellationToken.None);
 
-                        // Attaches the persistent job to this context instead
                         context.Attach(workitem);
 
                         try
@@ -83,7 +84,7 @@ public class DeferredQueue
                             // Invoke and complete
                             var outputObject = await invokable.Invoke(
                                 inputObject,
-                                services,
+                                scoped.ServiceProvider,
                                 cancellationToken
                             );
                             workitem.Complete(outputObject);
