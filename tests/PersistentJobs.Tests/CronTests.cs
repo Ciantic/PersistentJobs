@@ -114,7 +114,7 @@ public class CronTests : BaseTests
                         0,
                         'DoSomething',
                         'Manual',
-                        '{{""Minute"":12}}',
+                        '{{}}',
                         'CronImmediately',
                         NULL
                         
