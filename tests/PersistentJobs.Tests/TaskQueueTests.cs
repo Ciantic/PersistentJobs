@@ -259,6 +259,19 @@ public class TaskQueueTests
     }
 
     [Fact]
+    public async Task TestExceptionWithoutHandler()
+    {
+        var t = new TaskQueue();
+        t.Enqueue(
+            (CancellationToken token) =>
+            {
+                throw new Exception("What you did there?");
+            }
+        );
+        await Assert.ThrowsAsync<AggregateException>(t.Process);
+    }
+
+    [Fact]
     public async Task TestEmptyRun()
     {
         var t = new TaskQueue(maxParallelizationCount: 4);

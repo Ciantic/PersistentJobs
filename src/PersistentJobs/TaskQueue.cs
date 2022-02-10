@@ -1,9 +1,4 @@
 using System.Collections.Concurrent;
-using System.Dynamic;
-using System.Runtime.CompilerServices;
-using System.Security.AccessControl;
-using System.Threading;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace PersistentJobs;
 
@@ -44,16 +39,20 @@ internal class TaskQueue
             RunningTask = Task.Run(
                 async () =>
                 {
-                    try
+                    if (ExceptionHandler is not null)
                     {
-                        await Func.Invoke(CancellationTokenSource.Token);
-                    }
-                    catch (Exception e)
-                    {
-                        if (ExceptionHandler is not null)
+                        try
+                        {
+                            await Func.Invoke(CancellationTokenSource.Token);
+                        }
+                        catch (Exception e)
                         {
                             ExceptionHandler(e);
                         }
+                    }
+                    else
+                    {
+                        await Func.Invoke(CancellationTokenSource.Token);
                     }
                 },
                 CancellationTokenSource.Token
@@ -160,11 +159,15 @@ internal class TaskQueue
     public async Task Process()
     {
         var t = _tscQueue.Task;
-        StartTasks();
+        var exceptions = StartTasks();
         await t;
+        if (exceptions.Any())
+        {
+            throw new AggregateException(exceptions);
+        }
     }
 
-    public void ProcessBackground(Action<Exception>? exception = null)
+    public void ProcessBackground(Action<AggregateException>? exception = null)
     {
         Task.Run(Process)
             .ContinueWith(
@@ -177,8 +180,9 @@ internal class TaskQueue
             );
     }
 
-    private void StartTasks()
+    private IEnumerable<Exception> StartTasks()
     {
+        var exceptions = new ConcurrentBag<Exception>();
         var startMaxCount = _maxParallelizationCount - _runningTasks.Count;
         for (int i = 0; i < startMaxCount; i++)
         {
@@ -199,13 +203,23 @@ internal class TaskQueue
             t.ContinueWith(
                 (t2) =>
                 {
+                    if (t2.Exception is not null)
+                    {
+                        foreach (var ex in t2.Exception.InnerExceptions)
+                        {
+                            exceptions.Add(ex);
+                        }
+                    }
                     if (!_runningTasks.TryRemove(t2.GetHashCode(), out var _temp))
                     {
                         throw new Exception("Should not happen, hash codes are unique");
                     }
 
                     // Continue the queue processing
-                    StartTasks();
+                    foreach (var ex in StartTasks())
+                    {
+                        exceptions.Add(ex);
+                    }
                 }
             );
         }
@@ -216,5 +230,6 @@ internal class TaskQueue
             var _oldQueue = Interlocked.Exchange(ref _tscQueue, new TaskCompletionSource<bool>());
             _oldQueue.TrySetResult(true);
         }
+        return exceptions;
     }
 }
