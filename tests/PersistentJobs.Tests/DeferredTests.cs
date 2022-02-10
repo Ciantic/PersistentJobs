@@ -2,9 +2,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Internal;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Xunit;
 using Xunit.Abstractions;
 using static PersistentJobs.Tests.Worker;
@@ -120,10 +118,8 @@ public class PersistentJobTests : BaseTests
             async () =>
             {
                 var provider = ConfigureServices();
-                using var context = await provider
-                    .GetRequiredService<IDbContextFactory<DbContext>>()
-                    .CreateDbContextAsync();
                 var service = new DeferredQueue(opts: new(), provider);
+                using var context = CreateContext();
                 await service.ProcessAsync(context);
             }
         );
@@ -220,10 +216,8 @@ public class PersistentJobTests : BaseTests
             {
                 // Background service runs in own thread and scope
                 var provider = ConfigureServices();
-                using var context = await provider
-                    .GetRequiredService<IDbContextFactory<DbContext>>()
-                    .CreateDbContextAsync();
                 var service = new DeferredQueue(opts: new(), provider);
+                using var context = CreateContext();
                 await service.ProcessAsync(context);
             }
         );
