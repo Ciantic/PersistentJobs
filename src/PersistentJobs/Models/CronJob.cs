@@ -31,7 +31,7 @@ internal class CronJob
         get { return (MethodName, Scheduler, SchedulerJson); }
     }
 
-    internal async Task Schedule(DbContext context, IServiceProvider services)
+    internal void Schedule(DbContext context, IServiceProvider services)
     {
         if (SchedulerInstance is null)
         {
@@ -54,8 +54,7 @@ internal class CronJob
             );
             if (runNextTime is not null && runNextTime.HasValue)
             {
-                Current =
-                    (await DeferredQueue.EnqueueCronjob(context, this, (DateTime)runNextTime)).Job;
+                Current = DeferredQueue.EnqueueCronjob(context, this, (DateTime)runNextTime).Job;
                 ConcurrencyStamp = Guid.NewGuid();
             }
         }
@@ -73,9 +72,7 @@ internal class CronJob
                 if (runNextTime is not null && runNextTime.HasValue)
                 {
                     Current =
-                        (
-                            await DeferredQueue.EnqueueCronjob(context, this, (DateTime)runNextTime)
-                        ).Job;
+                        DeferredQueue.EnqueueCronjob(context, this, (DateTime)runNextTime).Job;
                     ConcurrencyStamp = Guid.NewGuid();
                 }
             }
@@ -136,7 +133,7 @@ internal class CronJob
                 {
                     // Non-existing jobs, create job
                     returnCronJobs.Add(j);
-                    await context.Set<CronJob>().AddAsync(j);
+                    context.Set<CronJob>().Add(j);
                 }
             }
 

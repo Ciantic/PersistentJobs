@@ -105,7 +105,7 @@ public class PersistentJobTests : BaseTests
         // Http runs in own thread and scope, creates a deferred task
         using (var httpDbContext = CreateContext())
         {
-            deferred = await Worker.ExampleJobDeferred(
+            deferred = ExampleJobDeferred(
                 new() { First = "First", Second = "Second" },
                 httpDbContext
             );
@@ -144,7 +144,7 @@ public class PersistentJobTests : BaseTests
 
         using (var httpDbContext = CreateContext())
         {
-            deferred = await Worker.AnotherJobCancellableDeferred(42, httpDbContext);
+            deferred = AnotherJobCancellableDeferred(42, httpDbContext);
             await httpDbContext.SaveChangesAsync();
         }
 
@@ -205,7 +205,7 @@ public class PersistentJobTests : BaseTests
 
         using (var httpDbContext = CreateContext())
         {
-            deferred = await Worker.UnitJobDeferred(httpDbContext);
+            deferred = UnitJobDeferred(httpDbContext);
             await httpDbContext.SaveChangesAsync();
         }
 
@@ -239,7 +239,7 @@ public class PersistentJobTests : BaseTests
 
         using (var httpDbContext = CreateContext())
         {
-            deferred = await Worker.ExceptionJobDeferred(httpDbContext);
+            deferred = ExceptionJobDeferred(httpDbContext);
             await httpDbContext.SaveChangesAsync();
         }
 
@@ -296,10 +296,10 @@ public class PersistentJobTests : BaseTests
 
         using (var httpDbContext = CreateContext())
         {
-            d1 = await Worker.SingleRunningMethodDeferred(httpDbContext);
-            d2 = await Worker.SingleRunningMethodDeferred(httpDbContext);
-            d3 = await Worker.SingleRunningMethodDeferred(httpDbContext);
-            d4 = await Worker.SingleRunningMethodDeferred(httpDbContext);
+            d1 = SingleRunningMethodDeferred(httpDbContext);
+            d2 = SingleRunningMethodDeferred(httpDbContext);
+            d3 = SingleRunningMethodDeferred(httpDbContext);
+            d4 = SingleRunningMethodDeferred(httpDbContext);
             await httpDbContext.SaveChangesAsync();
         }
 
@@ -346,10 +346,10 @@ public class PersistentJobTests : BaseTests
 
         using (var httpDbContext = CreateContext())
         {
-            d1 = await Worker.SingleRunningMethod2Deferred(httpDbContext);
-            d2 = await Worker.SingleRunningMethod2Deferred(httpDbContext);
-            d3 = await Worker.SingleRunningMethod2Deferred(httpDbContext);
-            d4 = await Worker.SingleRunningMethod2Deferred(httpDbContext);
+            d1 = SingleRunningMethod2Deferred(httpDbContext);
+            d2 = SingleRunningMethod2Deferred(httpDbContext);
+            d3 = SingleRunningMethod2Deferred(httpDbContext);
+            d4 = SingleRunningMethod2Deferred(httpDbContext);
             await httpDbContext.SaveChangesAsync();
         }
 

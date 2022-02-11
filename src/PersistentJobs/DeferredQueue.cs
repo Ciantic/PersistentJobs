@@ -163,7 +163,7 @@ public class DeferredQueue
         }
     }
 
-    internal async static Task<Deferred> EnqueueCronjob(
+    internal static Deferred EnqueueCronjob(
         DbContext context,
         CronJob cronJob,
         DateTime attemptAfter
@@ -180,10 +180,10 @@ public class DeferredQueue
             cronJob,
             new DeferredOptions() { AttemptAfter = attemptAfter }
         );
-        return await DeferredJob.Repository.Insert(context, deferredJob);
+        return DeferredJob.Repository.Insert(context, deferredJob);
     }
 
-    public async static Task<Deferred> Enqueue(
+    public static Deferred Enqueue(
         DbContext context,
         Delegate methodDelegate,
         object? input = null,
@@ -191,10 +191,10 @@ public class DeferredQueue
     )
     {
         var job = DeferredJob.CreateFromMethod(methodDelegate.GetMethodInfo(), input, opts);
-        return await DeferredJob.Repository.Insert(context, job);
+        return DeferredJob.Repository.Insert(context, job);
     }
 
-    public async static Task<Deferred<O>> Enqueue<O>(
+    public static Deferred<O> Enqueue<O>(
         DbContext context,
         Delegate methodDelegate,
         object? input,
@@ -202,7 +202,7 @@ public class DeferredQueue
     )
     {
         var job = DeferredJob.CreateFromMethod(methodDelegate.GetMethodInfo(), input, opts);
-        return await DeferredJob.Repository.Insert<O>(context, job);
+        return DeferredJob.Repository.Insert<O>(context, job);
     }
 
     private void BuildMethodsCache()

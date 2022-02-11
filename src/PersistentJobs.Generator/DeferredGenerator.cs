@@ -101,13 +101,13 @@ namespace PersistentJobs.Generator
                         public partial class {className}
                         {{
                             
-                            async public static Task<{output}> {methodName}Deferred(
+                            public static {output} {methodName}Deferred(
                                 {inputArgOpt} 
                                 Microsoft.EntityFrameworkCore.DbContext context,
                                 DeferredOptions? opts = null
                             ) 
                             {{
-                                return await DeferredQueue.Enqueue{addTaskGeneric}(context, {methodName}, {inputParam}, opts);
+                                return DeferredQueue.Enqueue{addTaskGeneric}(context, {methodName}, {inputParam}, opts);
                             }}
                         }}
                     }}

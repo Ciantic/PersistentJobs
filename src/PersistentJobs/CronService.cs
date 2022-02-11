@@ -28,7 +28,7 @@ public class CronService
 
         foreach (var m in methods)
         {
-            await m.Schedule(context, services);
+            m.Schedule(context, services);
         }
 
         try

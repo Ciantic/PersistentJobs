@@ -151,15 +151,15 @@ internal class DeferredJob
             return jobs;
         }
 
-        internal async static Task<Deferred> Insert(DbContext context, DeferredJob job)
+        internal static Deferred Insert(DbContext context, DeferredJob job)
         {
-            await context.Set<DeferredJob>().AddAsync(job);
+            context.Set<DeferredJob>().Add(job);
             return new Deferred(job);
         }
 
-        internal async static Task<Deferred<O>> Insert<O>(DbContext context, DeferredJob job)
+        internal static Deferred<O> Insert<O>(DbContext context, DeferredJob job)
         {
-            await context.Set<DeferredJob>().AddAsync(job);
+            context.Set<DeferredJob>().Add(job);
             return new Deferred<O>(job);
         }
 
