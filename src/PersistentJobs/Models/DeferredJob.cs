@@ -153,13 +153,13 @@ internal class DeferredJob
             return jobs;
         }
 
-        internal static Deferred Insert(DbContext context, DeferredJob job)
+        internal static Deferred Add(DbContext context, DeferredJob job)
         {
             context.Set<DeferredJob>().Add(job);
             return new Deferred(job);
         }
 
-        internal static Deferred<O> Insert<O>(DbContext context, DeferredJob job)
+        internal static Deferred<O> Add<O>(DbContext context, DeferredJob job)
         {
             context.Set<DeferredJob>().Add(job);
             return new Deferred<O>(job);
@@ -255,7 +255,7 @@ internal class DeferredJob
         {
             throw new InvalidOperationException("Finished job can't be cancelled anymore");
         }
-        InsertException(context, exception);
+        AddException(context, exception);
 
         Queued = null;
         Status = DeferredStatus.Canceled;
@@ -263,7 +263,7 @@ internal class DeferredJob
         ConcurrencyStamp = Guid.NewGuid();
     }
 
-    internal void InsertException(DbContext context, Exception exception)
+    internal void AddException(DbContext context, Exception exception)
     {
         if (Queued == null)
         {
@@ -291,7 +291,7 @@ internal class DeferredJob
             AttemptAfter = DateTime.UtcNow + WaitBetweenAttempts;
         }
 
-        DeferredJobException.Insert(context, this, exception);
+        DeferredJobException.Add(context, this, exception);
     }
 
     static internal DeferredJob CreateFromMethod(

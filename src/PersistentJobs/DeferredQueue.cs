@@ -105,12 +105,12 @@ public class DeferredQueue
                         }
                         catch (TargetInvocationException te)
                         {
-                            workitem.InsertException(context, te.InnerException);
+                            workitem.AddException(context, te.InnerException);
                             await context.SaveChangesAsync(CancellationToken.None);
                         }
                         catch (Exception ex)
                         {
-                            workitem.InsertException(context, ex);
+                            workitem.AddException(context, ex);
                             await context.SaveChangesAsync(CancellationToken.None);
                         }
                     }
@@ -193,7 +193,7 @@ public class DeferredQueue
             cronJob,
             new DeferredOptions() { AttemptAfter = attemptAfter }
         );
-        return DeferredJob.Repository.Insert(context, deferredJob);
+        return DeferredJob.Repository.Add(context, deferredJob);
     }
 
     public static Deferred Enqueue(
@@ -204,7 +204,7 @@ public class DeferredQueue
     )
     {
         var job = DeferredJob.CreateFromMethod(methodDelegate.GetMethodInfo(), input, opts);
-        return DeferredJob.Repository.Insert(context, job);
+        return DeferredJob.Repository.Add(context, job);
     }
 
     public static Deferred<O> Enqueue<O>(
@@ -215,7 +215,7 @@ public class DeferredQueue
     )
     {
         var job = DeferredJob.CreateFromMethod(methodDelegate.GetMethodInfo(), input, opts);
-        return DeferredJob.Repository.Insert<O>(context, job);
+        return DeferredJob.Repository.Add<O>(context, job);
     }
 
     private void BuildMethodsCache()

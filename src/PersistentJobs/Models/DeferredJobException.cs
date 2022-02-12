@@ -28,7 +28,7 @@ internal class DeferredJobException
         model.Property(p => p.Raised);
     }
 
-    static internal void Insert(DbContext context, DeferredJob job, Exception ex)
+    static internal void Add(DbContext context, DeferredJob job, Exception ex)
     {
         var exj = new DeferredJobException()
         {
