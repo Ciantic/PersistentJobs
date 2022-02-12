@@ -107,6 +107,44 @@ public class PersistentJobTests : BaseTests
     {
         Init();
 
+        Deferred<Input> deferred;
+        // Http runs in own thread and scope, creates a deferred task
+        using (var httpDbContext = CreateContext())
+        {
+            deferred = ExampleJobDeferred(
+                new() { First = "First", Second = "Second" },
+                httpDbContext
+            );
+            await httpDbContext.SaveChangesAsync();
+        }
+
+        // Sometime later, the service runs the deferred tasks autonomusly (to
+        // speed things up we call it manually)
+        await Task.Run(
+            async () =>
+            {
+                var provider = ConfigureServices();
+                var service = new DeferredQueue(opts: new(), provider);
+                using var context = CreateContext();
+                await service.ProcessAsync(context);
+            }
+        );
+
+        // Then user wants to look at the value
+        using (var httpDbContext = CreateContext())
+        {
+            var output = await deferred.GetOutput(httpDbContext);
+            Assert.Equal("First Append 1", output.First);
+            Assert.Equal("Second Append 2", output.Second);
+            Assert.Equal(DeferredStatus.Succeeded, await deferred.GetStatus(httpDbContext));
+        }
+    }
+
+    [Fact]
+    async public void TestCancelFromInsideJob()
+    {
+        Init();
+
         Deferred deferred;
         // Http runs in own thread and scope, creates a deferred task
         using (var httpDbContext = CreateContext())
@@ -132,67 +170,6 @@ public class PersistentJobTests : BaseTests
         {
             var output = await deferred.GetStatus(httpDbContext);
             Assert.Equal(DeferredStatus.Canceled, await deferred.GetStatus(httpDbContext));
-        }
-    }
-
-    [Fact]
-    async public void TestJobCancellationFromWithin()
-    {
-        Init();
-
-        // Http runs in own thread and scope, creates a deferred task
-        Deferred<bool> deferred;
-
-        using (var httpDbContext = CreateContext())
-        {
-            deferred = AnotherJobCancellableDeferred(42, httpDbContext);
-            await httpDbContext.SaveChangesAsync();
-        }
-
-        // Sometime later, the service runs the deferred tasks autonomusly (to
-        // speed things up we call it manually)
-        await Task.Run(
-            async () =>
-            {
-                // Background service runs in own thread and scope
-                var provider = ConfigureServices();
-                var service = new DeferredQueue(opts: new(), provider);
-                using (var context = CreateContext())
-                {
-                    var _ = service.ProcessAsync(context);
-                }
-
-                await Task.Run(
-                    async () =>
-                    {
-                        await Task.Delay(50);
-
-                        // Ensure it is running
-                        using (var httpDbContext = CreateContext())
-                        {
-                            Assert.Equal(
-                                DeferredStatus.Queued,
-                                await deferred.GetStatus(httpDbContext)
-                            );
-                        }
-
-                        // Then stop it
-                        //
-                        // (this should cancel the CancellationToken given to
-                        // the `AnotherJobCancellable`)
-                        await service.CancelAsync();
-                    }
-                );
-            }
-        );
-
-        // Then user wants to look at the value
-        using (var httpDbContext = CreateContext())
-        {
-            var exceptions = await deferred.GetExceptions(httpDbContext);
-            var first = exceptions.First();
-            Assert.Equal("System.Threading.Tasks.TaskCanceledException", first.Name);
-            Assert.Equal(DeferredStatus.Failed, await deferred.GetStatus(httpDbContext));
         }
     }
 
