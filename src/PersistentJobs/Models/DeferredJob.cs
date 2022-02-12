@@ -107,6 +107,8 @@ internal class DeferredJob
             IEnumerable<string> maxMethods = maxParallelizationByMethod.Keys;
             List<DeferredJob> jobs = new();
 
+            // Get jobs with max parallelization limit, by taking only fixed
+            // amount of each
             foreach (var (method, maxP) in maxParallelizationByMethod)
             {
                 jobs.AddRange(
