@@ -28,7 +28,7 @@ internal class DeferredJobException
         model.Property(p => p.Raised);
     }
 
-    static async internal Task Insert(DbContext context, DeferredJob job, Exception ex)
+    static internal void Insert(DbContext context, DeferredJob job, Exception ex)
     {
         var exj = new DeferredJobException()
         {
@@ -38,7 +38,7 @@ internal class DeferredJobException
             StackTrace = ex.StackTrace ?? "",
             PersistentJob = job
         };
-        await context.AddAsync(exj);
+        context.Add(exj);
     }
 
     static async internal Task<DeferredJobException[]> GetAllForJob(

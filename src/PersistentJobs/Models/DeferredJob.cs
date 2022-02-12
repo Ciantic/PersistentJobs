@@ -247,7 +247,21 @@ internal class DeferredJob
         ConcurrencyStamp = Guid.NewGuid();
     }
 
-    async internal Task InsertException(DbContext context, Exception exception)
+    internal void Cancel(DbContext context, DeferredCanceledException exception)
+    {
+        if (Finished is not null)
+        {
+            throw new InvalidOperationException("Finished job can't be cancelled anymore");
+        }
+        InsertException(context, exception);
+
+        Queued = null;
+        Status = DeferredStatus.Canceled;
+        Finished = DateTime.UtcNow;
+        ConcurrencyStamp = Guid.NewGuid();
+    }
+
+    internal void InsertException(DbContext context, Exception exception)
     {
         if (Queued == null)
         {
@@ -256,7 +270,7 @@ internal class DeferredJob
 
         if (Finished != null)
         {
-            throw new InvalidOperationException("Finished items can't raise exceptions");
+            throw new InvalidOperationException("Finished job can't raise exceptions");
         }
 
         Queued = null;
@@ -275,7 +289,7 @@ internal class DeferredJob
             AttemptAfter = DateTime.UtcNow + WaitBetweenAttempts;
         }
 
-        await DeferredJobException.Insert(context, this, exception);
+        DeferredJobException.Insert(context, this, exception);
     }
 
     static internal DeferredJob CreateFromMethod(
@@ -292,7 +306,7 @@ internal class DeferredJob
 
         if (!method.IsStatic)
         {
-            throw new InvalidOperationException("Persistent jobs work only on static methods.");
+            throw new InvalidOperationException("Deferred jobs work only on static methods.");
         }
 
         if (!method.IsPublic)

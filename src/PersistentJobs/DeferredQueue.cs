@@ -25,6 +25,13 @@ public class DeferredQueue
 
     public async Task CancelAsync()
     {
+        // Usually this is used when the process stops to ensure the tasks are
+        // canceled gracefully. This does not cancel the jobs in queue if they
+        // have policy to retry.
+
+        // To permanently cancel individual jobs, Deferred.Cancel() method needs
+        // to be used.
+
         queue.Cancel();
         await queue.Process();
     }
@@ -90,14 +97,20 @@ public class DeferredQueue
                             workitem.Complete(outputObject);
                             await context.SaveChangesAsync(CancellationToken.None);
                         }
+                        catch (TargetInvocationException ex)
+                            when (ex.InnerException is DeferredCanceledException exception)
+                        {
+                            workitem.Cancel(context, exception);
+                            await context.SaveChangesAsync(CancellationToken.None);
+                        }
                         catch (TargetInvocationException te)
                         {
-                            await workitem.InsertException(context, te.InnerException);
+                            workitem.InsertException(context, te.InnerException);
                             await context.SaveChangesAsync(CancellationToken.None);
                         }
                         catch (Exception ex)
                         {
-                            await workitem.InsertException(context, ex);
+                            workitem.InsertException(context, ex);
                             await context.SaveChangesAsync(CancellationToken.None);
                         }
                     }

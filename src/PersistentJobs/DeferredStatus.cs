@@ -5,5 +5,6 @@ public enum DeferredStatus
     Queued,
     Succeeded,
     Failed,
+    Canceled,
     Waiting
 }
