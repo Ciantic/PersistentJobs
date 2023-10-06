@@ -13,8 +13,8 @@ internal class DeferredJob
     internal Guid Id { get; private set; } = Guid.NewGuid();
     internal string MethodName { get; private set; } = "";
     internal DeferredStatus Status { get; private set; } = DeferredStatus.Waiting;
-    private string? InputJson { get; set; } = "";
-    private string? OutputJson { get; set; } = null;
+    private JsonDocument? InputJson { get; set; } = null;
+    private JsonDocument? OutputJson { get; set; } = null;
     private TimeSpan? TimeLimit { get; set; } = null;
     private TimeSpan? WaitBetweenAttempts { get; set; } = null;
     private uint Attempts { get; set; } = 0;
@@ -27,13 +27,14 @@ internal class DeferredJob
 
     private DeferredJob() { }
 
+
     internal static void ConfigureModelBuilder(ModelBuilder modelBuilder)
     {
         var model = modelBuilder.Entity<DeferredJob>();
         model.Property(p => p.Id);
         model.Property(p => p.MethodName);
-        model.Property(p => p.InputJson);
-        model.Property(p => p.OutputJson);
+        model.Property(p => p.InputJson).HasSqliteJsonDocumentConversion();
+        model.Property(p => p.OutputJson).HasSqliteJsonDocumentConversion();
         model.Property(p => p.Created);
         model.Property(p => p.Queued);
         model.Property(p => p.Finished);
@@ -244,7 +245,7 @@ internal class DeferredJob
         }
 
         Status = DeferredStatus.Succeeded;
-        OutputJson = JsonSerializer.Serialize(outputValue);
+        OutputJson = JsonSerializer.SerializeToDocument(outputValue);
         Finished = DateTime.UtcNow;
         ConcurrencyStamp = Guid.NewGuid();
     }
@@ -322,7 +323,7 @@ internal class DeferredJob
         return new DeferredJob()
         {
             MethodName = methodName,
-            InputJson = JsonSerializer.Serialize(input),
+            InputJson = JsonSerializer.SerializeToDocument(input),
             WaitBetweenAttempts = opts?.WaitBetweenAttempts ?? attribute.WaitBetweenAttempts,
             TimeLimit = opts?.TimeLimit ?? attribute.TimeLimit,
             MaxAttempts = opts?.MaxAttempts ?? attribute.MaxAttempts,
