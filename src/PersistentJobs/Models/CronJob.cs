@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 
 namespace PersistentJobs;
@@ -15,7 +16,7 @@ internal class CronJob
     private Guid Id { get; set; } = Guid.NewGuid();
     internal string MethodName { get; private set; } = "";
 
-    internal JsonDocument? InputJson { get; private set; } = null;
+    internal JsonNode? InputJson { get; private set; } = null;
     private string Scheduler { get; set; } = "";
     internal CronScheduler? SchedulerInstance { get; private set; } = null;
     private string SchedulerJson { get; set; } = "{}";
@@ -84,7 +85,7 @@ internal class CronJob
         var model = modelBuilder.Entity<CronJob>();
         model.Property(p => p.Id);
         model.Property(p => p.MethodName);
-        model.Property(p => p.InputJson).HasSqliteJsonDocumentConversion();
+        model.Property(p => p.InputJson).HasJsonNodeConversion();
         model.Property(p => p.Created);
         model.HasOne(p => p.Current);
         model.Property(p => p.ConcurrencyStamp).IsConcurrencyToken();

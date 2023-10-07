@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 
 namespace PersistentJobs;
@@ -13,8 +14,8 @@ internal class DeferredJob
     internal Guid Id { get; private set; } = Guid.NewGuid();
     internal string MethodName { get; private set; } = "";
     internal DeferredStatus Status { get; private set; } = DeferredStatus.Waiting;
-    private JsonDocument? InputJson { get; set; } = null;
-    private JsonDocument? OutputJson { get; set; } = null;
+    private JsonNode? InputJson { get; set; } = null;
+    private JsonNode? OutputJson { get; set; } = null;
     private TimeSpan? TimeLimit { get; set; } = null;
     private TimeSpan? WaitBetweenAttempts { get; set; } = null;
     private uint Attempts { get; set; } = 0;
@@ -33,8 +34,8 @@ internal class DeferredJob
         var model = modelBuilder.Entity<DeferredJob>();
         model.Property(p => p.Id);
         model.Property(p => p.MethodName);
-        model.Property(p => p.InputJson).HasSqliteJsonDocumentConversion();
-        model.Property(p => p.OutputJson).HasSqliteJsonDocumentConversion();
+        model.Property(p => p.InputJson).HasJsonNodeConversion();
+        model.Property(p => p.OutputJson).HasJsonNodeConversion();
         model.Property(p => p.Created);
         model.Property(p => p.Queued);
         model.Property(p => p.Finished);
@@ -245,7 +246,7 @@ internal class DeferredJob
         }
 
         Status = DeferredStatus.Succeeded;
-        OutputJson = JsonSerializer.SerializeToDocument(outputValue);
+        OutputJson = JsonSerializer.SerializeToNode(outputValue);
         Finished = DateTime.UtcNow;
         ConcurrencyStamp = Guid.NewGuid();
     }
@@ -323,7 +324,7 @@ internal class DeferredJob
         return new DeferredJob()
         {
             MethodName = methodName,
-            InputJson = JsonSerializer.SerializeToDocument(input),
+            InputJson = JsonSerializer.SerializeToNode(input),
             WaitBetweenAttempts = opts?.WaitBetweenAttempts ?? attribute.WaitBetweenAttempts,
             TimeLimit = opts?.TimeLimit ?? attribute.TimeLimit,
             MaxAttempts = opts?.MaxAttempts ?? attribute.MaxAttempts,
